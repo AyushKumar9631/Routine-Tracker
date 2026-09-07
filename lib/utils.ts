@@ -155,5 +155,7 @@ export function defaultActivityForm(): import("@/lib/types").ActivityFormInput {
     completion_type: "boolean",
     target_value: null,
     unit_label: "",
+    automation_type: "none",
+    leetcode_username: "",
   };
 }

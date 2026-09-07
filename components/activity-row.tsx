@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { logCompletion } from "@/actions/completions";
+import { LeetcodeSyncButton } from "@/components/leetcode-sync-button";
 import type { Activity, Completion } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ export function ActivityRow({
   const [count, setCount] = useState<number>(completion?.value ?? 0);
 
   const isDone = completion?.completed ?? false;
+  const isLeetcode = activity.is_automated && activity.automation_type === "leetcode_potd";
 
   function toggleBoolean() {
     startTransition(async () => {
@@ -41,8 +43,8 @@ export function ActivityRow({
     <li className="flex items-center gap-4 border-b border-line py-4 last:border-b-0">
       <button
         type="button"
-        onClick={activity.completion_type === "boolean" ? toggleBoolean : undefined}
-        disabled={activity.completion_type !== "boolean" || isPending}
+        onClick={activity.completion_type === "boolean" && !isLeetcode ? toggleBoolean : undefined}
+        disabled={activity.completion_type !== "boolean" || isPending || isLeetcode}
         aria-pressed={isDone}
         className={cn(
           "flex h-8 w-8 shrink-0 items-center justify-center rounded border text-sm transition-colors",
@@ -65,9 +67,12 @@ export function ActivityRow({
         {activity.description && (
           <p className="mt-0.5 truncate text-xs text-ink-soft">{activity.description}</p>
         )}
+        {isLeetcode && <p className="mt-0.5 text-xs text-ink-soft">Auto-tracked via LeetCode</p>}
       </div>
 
-      {activity.completion_type === "count" && (
+      {isLeetcode && <LeetcodeSyncButton activityId={activity.id} compact />}
+
+      {!isLeetcode && activity.completion_type === "count" && (
         <div className="flex shrink-0 items-center gap-2 font-mono text-sm">
           <button
             type="button"

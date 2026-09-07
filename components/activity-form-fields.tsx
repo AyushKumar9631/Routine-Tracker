@@ -10,6 +10,8 @@ export function ActivityFormFields({
   value: ActivityFormInput;
   onChange: (patch: Partial<ActivityFormInput>) => void;
 }) {
+  const isLeetcode = value.automation_type === "leetcode_potd";
+
   return (
     <div className="space-y-4">
       <div className="flex gap-3">
@@ -44,108 +46,148 @@ export function ActivityFormFields({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="field-label">Repeats</label>
-          <select
-            className="field-input"
-            value={value.period}
-            onChange={(e) => onChange({ period: e.target.value as Period })}
-          >
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="biweekly">Biweekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </div>
-
-        {(value.period === "weekly" || value.period === "biweekly") && (
-          <div>
-            <label className="field-label">On</label>
-            <select
-              className="field-input"
-              value={value.schedule_day_of_week ?? 1}
-              onChange={(e) => onChange({ schedule_day_of_week: Number(e.target.value) })}
-            >
-              {DAY_NAMES.map((day, i) => (
-                <option key={day} value={i}>
-                  {day}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {value.period === "monthly" && (
-          <div>
-            <label className="field-label">Day of month</label>
-            <input
-              type="number"
-              min={1}
-              max={31}
-              className="field-input"
-              value={value.schedule_day_of_month ?? 1}
-              onChange={(e) => onChange({ schedule_day_of_month: Number(e.target.value) })}
-            />
-          </div>
-        )}
+      <div>
+        <label className="field-label">Automation</label>
+        <select
+          className="field-input"
+          value={value.automation_type}
+          onChange={(e) => {
+            const automation_type = e.target.value as "none" | "leetcode_potd";
+            onChange(
+              automation_type === "leetcode_potd"
+                ? { automation_type, period: "daily", completion_type: "boolean" }
+                : { automation_type }
+            );
+          }}
+        >
+          <option value="none">None &mdash; log it myself</option>
+          <option value="leetcode_potd">LeetCode Daily Challenge</option>
+        </select>
       </div>
 
-      {value.period === "biweekly" && (
+      {isLeetcode ? (
         <div>
-          <label className="field-label">Starting the week of</label>
+          <label className="field-label">LeetCode username</label>
           <input
-            type="date"
             className="field-input"
-            value={value.anchor_date ?? ""}
-            onChange={(e) => onChange({ anchor_date: e.target.value })}
+            placeholder="e.g. jsmith123"
+            required
+            value={value.leetcode_username}
+            onChange={(e) => onChange({ leetcode_username: e.target.value })}
           />
           <p className="mt-1 text-xs text-ink-soft">
-            Used to work out which weeks it&apos;s due, every other week from here.
+            Public profile only &mdash; no password needed. Runs daily and marks itself
+            complete once you&apos;ve solved today&apos;s problem.
           </p>
         </div>
-      )}
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">Repeats</label>
+              <select
+                className="field-input"
+                value={value.period}
+                onChange={(e) => onChange({ period: e.target.value as Period })}
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Biweekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="field-label">Completion</label>
-          <select
-            className="field-input"
-            value={value.completion_type}
-            onChange={(e) => onChange({ completion_type: e.target.value as CompletionType })}
-          >
-            <option value="boolean">Done / not done</option>
-            <option value="count">Hits a number</option>
-          </select>
-        </div>
+            {(value.period === "weekly" || value.period === "biweekly") && (
+              <div>
+                <label className="field-label">On</label>
+                <select
+                  className="field-input"
+                  value={value.schedule_day_of_week ?? 1}
+                  onChange={(e) => onChange({ schedule_day_of_week: Number(e.target.value) })}
+                >
+                  {DAY_NAMES.map((day, i) => (
+                    <option key={day} value={i}>
+                      {day}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-        {value.completion_type === "count" && (
-          <div>
-            <label className="field-label">Target</label>
-            <input
-              type="number"
-              min={1}
-              className="field-input"
-              placeholder="5"
-              value={value.target_value ?? ""}
-              onChange={(e) =>
-                onChange({ target_value: e.target.value === "" ? null : Number(e.target.value) })
-              }
-            />
+            {value.period === "monthly" && (
+              <div>
+                <label className="field-label">Day of month</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  className="field-input"
+                  value={value.schedule_day_of_month ?? 1}
+                  onChange={(e) => onChange({ schedule_day_of_month: Number(e.target.value) })}
+                />
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {value.completion_type === "count" && (
-        <div>
-          <label className="field-label">Unit (optional)</label>
-          <input
-            className="field-input"
-            placeholder="commits, problems, pages\u2026"
-            value={value.unit_label}
-            onChange={(e) => onChange({ unit_label: e.target.value })}
-          />
-        </div>
+          {value.period === "biweekly" && (
+            <div>
+              <label className="field-label">Starting the week of</label>
+              <input
+                type="date"
+                className="field-input"
+                value={value.anchor_date ?? ""}
+                onChange={(e) => onChange({ anchor_date: e.target.value })}
+              />
+              <p className="mt-1 text-xs text-ink-soft">
+                Used to work out which weeks it&apos;s due, every other week from here.
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">Completion</label>
+              <select
+                className="field-input"
+                value={value.completion_type}
+                onChange={(e) => onChange({ completion_type: e.target.value as CompletionType })}
+              >
+                <option value="boolean">Done / not done</option>
+                <option value="count">Hits a number</option>
+              </select>
+            </div>
+
+            {value.completion_type === "count" && (
+              <div>
+                <label className="field-label">Target</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="field-input"
+                  placeholder="5"
+                  value={value.target_value ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      target_value: e.target.value === "" ? null : Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+            )}
+          </div>
+
+          {value.completion_type === "count" && (
+            <div>
+              <label className="field-label">Unit (optional)</label>
+              <input
+                className="field-input"
+                placeholder="commits, problems, pages\u2026"
+                value={value.unit_label}
+                onChange={(e) => onChange({ unit_label: e.target.value })}
+              />
+            </div>
+          )}
+        </>
       )}
 
       <div className="flex items-center gap-3">

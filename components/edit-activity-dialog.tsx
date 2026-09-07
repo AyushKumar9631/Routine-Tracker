@@ -4,9 +4,10 @@ import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { ActivityFormFields } from "@/components/activity-form-fields";
 import { updateActivity, deleteActivity } from "@/actions/activities";
+import { getLeetcodeUsername } from "@/actions/leetcode";
 import type { Activity, ActivityFormInput } from "@/lib/types";
 
-function toFormInput(activity: Activity): ActivityFormInput {
+function toFormInput(activity: Activity, leetcodeUsername = ""): ActivityFormInput {
   return {
     name: activity.name,
     description: activity.description ?? "",
@@ -19,6 +20,8 @@ function toFormInput(activity: Activity): ActivityFormInput {
     completion_type: activity.completion_type,
     target_value: activity.target_value,
     unit_label: activity.unit_label ?? "",
+    automation_type: activity.automation_type === "leetcode_potd" ? "leetcode_potd" : "none",
+    leetcode_username: leetcodeUsername,
   };
 }
 
@@ -30,8 +33,14 @@ export function EditActivityDialog({ activity }: { activity: Activity }) {
   const [error, setError] = useState("");
 
   function openDialog() {
-    setValue(toFormInput(activity));
     setOpen(true);
+    if (activity.automation_type === "leetcode_potd") {
+      getLeetcodeUsername(activity.id).then((username) =>
+        setValue(toFormInput(activity, username))
+      );
+    } else {
+      setValue(toFormInput(activity));
+    }
   }
 
   function close() {

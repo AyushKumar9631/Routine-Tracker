@@ -45,6 +45,37 @@ Push to GitHub, import into Vercel, add the same two env vars in the Vercel
 project settings, deploy. Add the resulting `*.vercel.app` URL to Supabase's
 redirect URLs list (step 1.4) or magic links will bounce back to localhost.
 
+## 5. LeetCode Daily Challenge automation
+
+1. SQL Editor → run `supabase/migrations/002_leetcode_potd.sql` (adds
+   `leetcode_potd_config`, RLS included).
+2. Project Settings → API → copy the **service_role** key (server-only,
+   bypasses RLS — never expose to the browser).
+3. Add to `.env.local` / Vercel env vars:
+   - `SUPABASE_SERVICE_ROLE_KEY` — the key from step 2.
+   - `CRON_SECRET` — any random string, e.g. `openssl rand -hex 32`.
+4. In the app: **+ Add activity** → Automation → **LeetCode Daily
+   Challenge** → enter your LeetCode username (public, no password). It
+   forces daily / done-not-done, since that's what POTD is.
+5. Scheduling the check — pick one:
+   - **Vercel Cron** (`vercel.json`, already wired to `30 22 * * *` UTC):
+     free on Hobby, but Hobby caps built-in cron at once/day, so a solve
+     right before that run could be missed until the next day's run.
+   - **GitHub Actions** (`.github/workflows/leetcode-potd-sync.yml`):
+     polls every 30 min, still free. Add repo secrets `APP_URL` (your
+     `https://*.vercel.app` URL) and `CRON_SECRET` (same value as step 3).
+     Recommended if you want same-day detection reliably.
+   - Either way, there's also a **Check now** button on the activity (Today
+     view and its detail page) for an on-demand check right after solving.
+
+How it works: LeetCode has no "did user X finish today's POTD" field, so
+this pairs two public GraphQL fields — `activeDailyCodingChallengeQuestion`
+(today's problem) and `recentAcSubmissionList(username, limit)` (a user's
+last N accepted submissions, public, no login) — and checks whether today's
+problem slug shows up in recent ACs with a timestamp on today's UTC date.
+The date check guards against LeetCode reusing an old problem as POTD,
+where an old accepted submission for that slug would otherwise false-match.
+
 ## Data model
 
 - **activities** — name, icon/color, `period` (daily/weekly/biweekly/monthly)

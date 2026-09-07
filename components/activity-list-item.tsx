@@ -38,6 +38,7 @@ export function ActivityListItem({ activity }: { activity: Activity }) {
             ` \u00b7 target ${activity.target_value}${
               activity.unit_label ? ` ${activity.unit_label}` : ""
             }`}
+          {activity.automation_type === "leetcode_potd" && " \u00b7 auto \u00b7 LeetCode"}
         </p>
       </div>
 

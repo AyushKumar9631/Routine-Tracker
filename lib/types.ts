@@ -26,6 +26,18 @@ export interface Activity {
   updated_at: string;
 }
 
+export interface LeetCodeConfig {
+  id: string;
+  activity_id: string;
+  user_id: string;
+  leetcode_username: string;
+  last_checked_at: string | null;
+  last_synced_date: string | null;
+  last_question_slug: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Completion {
   id: string;
   activity_id: string;
@@ -50,6 +62,9 @@ export interface ActivityFormInput {
   completion_type: CompletionType;
   target_value: number | null;
   unit_label: string;
+
+  automation_type: "none" | "leetcode_potd";
+  leetcode_username: string;
 }
 
 export const DAY_NAMES = [

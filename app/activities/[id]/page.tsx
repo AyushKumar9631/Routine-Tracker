@@ -3,10 +3,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Nav } from "@/components/nav";
 import { EditActivityDialog } from "@/components/edit-activity-dialog";
+import { LeetcodeSyncButton } from "@/components/leetcode-sync-button";
 import { StatPill } from "@/components/stat-pill";
 import { CompletionHeatmap } from "@/components/completion-heatmap";
 import { EmptyState } from "@/components/empty-state";
-import type { Activity, Completion } from "@/lib/types";
+import type { Activity, Completion, LeetCodeConfig } from "@/lib/types";
 import { calcCompletionRate, calcStreak, formatDateKey, parseDateKey, scheduleLabel } from "@/lib/utils";
 
 export default async function ActivityDetailPage({
@@ -35,6 +36,16 @@ export default async function ActivityDetailPage({
   const typedActivity = activity as Activity;
   const completions = (completionsData ?? []) as Completion[];
 
+  let leetcodeConfig: LeetCodeConfig | null = null;
+  if (typedActivity.automation_type === "leetcode_potd") {
+    const { data } = await supabase
+      .from("leetcode_potd_config")
+      .select("*")
+      .eq("activity_id", id)
+      .maybeSingle();
+    leetcodeConfig = data as LeetCodeConfig | null;
+  }
+
   const streak = calcStreak(typedActivity, completions);
   const rate30 = calcCompletionRate(typedActivity, completions, 30);
   const totalDone = completions.filter((c) => c.completed).length;
@@ -58,8 +69,18 @@ export default async function ActivityDetailPage({
             {typedActivity.description && (
               <p className="mt-2 max-w-md text-sm text-ink-soft">{typedActivity.description}</p>
             )}
+            {leetcodeConfig && (
+              <p className="mt-2 text-xs text-ink-soft">
+                Auto-tracked via LeetCode &middot; @{leetcodeConfig.leetcode_username}
+                {leetcodeConfig.last_checked_at &&
+                  ` \u00b7 last checked ${new Date(leetcodeConfig.last_checked_at).toLocaleString()}`}
+              </p>
+            )}
           </div>
-          <EditActivityDialog activity={typedActivity} />
+          <div className="flex items-center gap-3">
+            {leetcodeConfig && <LeetcodeSyncButton activityId={typedActivity.id} />}
+            <EditActivityDialog activity={typedActivity} />
+          </div>
         </div>
 
         <div className="mb-10 grid grid-cols-3 gap-3">
