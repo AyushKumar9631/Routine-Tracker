@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+
+  ::selection {
+    @apply bg-moss/20;
+  }
+
+  *:focus-visible {
+    outline: 2px solid theme("colors.moss.DEFAULT");
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .field-label {
+    @apply text-xs text-ink-soft mb-1 block;
+  }
+
+  .field-input {
+    @apply w-full rounded border border-line bg-card px-3 py-2 text-sm text-ink
+      placeholder:text-ink-soft/60 focus:border-moss focus:outline-none transition-colors;
+  }
+}
