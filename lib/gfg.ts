@@ -1,18 +1,20 @@
-// GFG doesn't publish a public API. This scrapes the public profile page
-// (https://auth.geeksforgeeks.org/user/<username>/profile) for the
-// "Current POTD Streak" counter, the only public signal that exists for
-// this. Note: that path is disallowed in GFG's robots.txt — this is the
-// same approach every unofficial "GFG API" project uses, since there's no
-// compliant alternative.
+// GFG doesn't publish a public API. The profile page also moved: it's now
+// https://www.geeksforgeeks.org/profile/<username> (the old
+// auth.geeksforgeeks.org/user/<username>/profile is stale). The page itself
+// renders client-side, but the initial HTML still ships the data needed to
+// hydrate it, embedded as an escaped JSON string inside a Next.js RSC
+// stream literal: `self.__next_f.push([1,"...\"pod_solved_current_streak\":N...`
+// (verified against a live profile page's raw source on 2026-09-09). The
+// real field names are pod_solved_current_streak / pod_solved_longest_streak
+// — not currentStreak/maxStreak, which never existed on this page and is
+// why every check used to fail with "Couldn't find streak...".
 //
-// The parsing below is best-effort: it wasn't possible to inspect GFG's
-// live markup directly (also robots-blocked), so it tries a couple of
-// patterns seen in equivalent open-source scrapers. If it throws
-// "Couldn't find streak...", the page structure has likely changed and
-// this needs a markup check + regex update.
+// Quotes inside that embedded string are backslash-escaped (it's a JS
+// string literal), so the regexes below tolerate an optional `\` before
+// each `"` in case that escaping ever changes.
 
 const PROFILE_URL = (username: string) =>
-  `https://auth.geeksforgeeks.org/user/${encodeURIComponent(username)}/profile`;
+  `https://www.geeksforgeeks.org/profile/${encodeURIComponent(username)}`;
 
 export interface GfgProfileResult {
   currentStreak: number;
@@ -28,23 +30,26 @@ export async function fetchGfgProfile(username: string): Promise<GfgProfileResul
     cache: "no-store",
   });
 
+  if (res.status === 404) {
+    throw new Error(`GFG username "${username}" not found`);
+  }
   if (!res.ok) {
     throw new Error(`GFG profile fetch failed: ${res.status}`);
   }
 
   const html = await res.text();
 
-  // Try embedded page-state JSON first (most stable if GFG's frontend ships it).
-  const jsonMatch = html.match(/"currentStreak"\s*:\s*"?(\d+)"?/);
-  if (jsonMatch) {
-    const maxMatch = html.match(/"maxStreak"\s*:\s*"?(\d+)"?/);
+  const currentMatch = html.match(/\\?"pod_solved_current_streak\\?"\s*:\s*(\d+)/);
+  if (currentMatch) {
+    const longestMatch = html.match(/\\?"pod_solved_longest_streak\\?"\s*:\s*(\d+)/);
     return {
-      currentStreak: Number(jsonMatch[1]),
-      maxStreak: maxMatch ? Number(maxMatch[1]) : null,
+      currentStreak: Number(currentMatch[1]),
+      maxStreak: longestMatch ? Number(longestMatch[1]) : null,
     };
   }
 
-  // Fallback: the rendered "NN /MM days" streak widget text.
+  // Fallback for older/alternate markup, kept in case GFG A/B tests a
+  // server-rendered variant of this widget.
   const textMatch = html.match(/Current POTD Streak[\s\S]{0,80}?(\d+)\s*\/\s*(\d+)/i);
   if (textMatch) {
     return { currentStreak: Number(textMatch[1]), maxStreak: Number(textMatch[2]) };
