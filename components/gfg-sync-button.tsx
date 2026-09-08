@@ -17,12 +17,12 @@ export function GfgSyncButton({
   function handleClick() {
     setMessage(null);
     startTransition(async () => {
-      try {
-        const result = await syncGfgPotdNow(activityId);
-        setMessage(result.solvedToday ? "Solved \u2713" : `Streak: ${result.currentStreak}`);
-      } catch (err) {
-        setMessage(err instanceof Error ? err.message : "Sync failed");
+      const result = await syncGfgPotdNow(activityId);
+      if (!result.ok) {
+        setMessage(result.error);
+        return;
       }
+      setMessage(result.solvedToday ? "Solved \u2713" : `Streak: ${result.currentStreak}`);
     });
   }
 
