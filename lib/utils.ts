@@ -157,5 +157,6 @@ export function defaultActivityForm(): import("@/lib/types").ActivityFormInput {
     unit_label: "",
     automation_type: "none",
     leetcode_username: "",
+    gfg_username: "",
   };
 }

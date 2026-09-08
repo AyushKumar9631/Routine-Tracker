@@ -39,6 +39,7 @@ export function ActivityListItem({ activity }: { activity: Activity }) {
               activity.unit_label ? ` ${activity.unit_label}` : ""
             }`}
           {activity.automation_type === "leetcode_potd" && " \u00b7 auto \u00b7 LeetCode"}
+          {activity.automation_type === "gfg_potd" && " \u00b7 auto \u00b7 GFG"}
         </p>
       </div>
 

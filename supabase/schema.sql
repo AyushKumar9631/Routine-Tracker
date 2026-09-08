@@ -13,7 +13,7 @@ create table if not exists activities (
   description text,
   icon text default '\u2713',
   color text default '#3F6B47',
-
+ 
   period period_type not null default 'daily',
   -- weekly / biweekly: 0 = Sunday ... 6 = Saturday
   schedule_day_of_week smallint check (schedule_day_of_week between 0 and 6),

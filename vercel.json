@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/leetcode-potd",
       "schedule": "30 22 * * *"
+    },
+    {
+      "path": "/api/cron/gfg-potd",
+      "schedule": "40 22 * * *"
     }
   ]
 }

@@ -1,0 +1,26 @@
+name: POTD Sync
+
+on:
+  schedule:
+    # Every 30 min. GitHub Actions cron is best-effort and can lag a bit,
+    # especially on the free tier — that's fine, "Check now" in the UI
+    # covers the instant case.
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync-leetcode:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger LeetCode sync endpoint
+        run: |
+          curl -sf -X GET "${{ secrets.APP_URL }}/api/cron/leetcode-potd" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  sync-gfg:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger GFG sync endpoint
+        run: |
+          curl -sf -X GET "${{ secrets.APP_URL }}/api/cron/gfg-potd" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

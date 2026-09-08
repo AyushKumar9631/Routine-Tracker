@@ -11,6 +11,8 @@ export function ActivityFormFields({
   onChange: (patch: Partial<ActivityFormInput>) => void;
 }) {
   const isLeetcode = value.automation_type === "leetcode_potd";
+  const isGfg = value.automation_type === "gfg_potd";
+  const isAutomated = isLeetcode || isGfg;
 
   return (
     <div className="space-y-4">
@@ -52,20 +54,21 @@ export function ActivityFormFields({
           className="field-input"
           value={value.automation_type}
           onChange={(e) => {
-            const automation_type = e.target.value as "none" | "leetcode_potd";
+            const automation_type = e.target.value as "none" | "leetcode_potd" | "gfg_potd";
             onChange(
-              automation_type === "leetcode_potd"
-                ? { automation_type, period: "daily", completion_type: "boolean" }
-                : { automation_type }
+              automation_type === "none"
+                ? { automation_type }
+                : { automation_type, period: "daily", completion_type: "boolean" }
             );
           }}
         >
           <option value="none">None &mdash; log it myself</option>
           <option value="leetcode_potd">LeetCode Daily Challenge</option>
+          <option value="gfg_potd">GFG Problem of the Day</option>
         </select>
       </div>
 
-      {isLeetcode ? (
+      {isLeetcode && (
         <div>
           <label className="field-label">LeetCode username</label>
           <input
@@ -80,7 +83,28 @@ export function ActivityFormFields({
             complete once you&apos;ve solved today&apos;s problem.
           </p>
         </div>
-      ) : (
+      )}
+
+      {isGfg && (
+        <div>
+          <label className="field-label">GFG username</label>
+          <input
+            className="field-input"
+            placeholder="e.g. jsmith123"
+            required
+            value={value.gfg_username}
+            onChange={(e) => onChange({ gfg_username: e.target.value })}
+          />
+          <p className="mt-1 text-xs text-ink-soft">
+            Public profile only. GFG doesn&apos;t expose per-problem data, so this tracks
+            your public POTD streak counter instead &mdash; the first check just sets a
+            baseline, and it starts marking itself complete from the next streak
+            increase onward.
+          </p>
+        </div>
+      )}
+
+      {!isAutomated && (
         <>
           <div className="grid grid-cols-2 gap-3">
             <div>

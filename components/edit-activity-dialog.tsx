@@ -5,9 +5,18 @@ import { Modal } from "@/components/ui/modal";
 import { ActivityFormFields } from "@/components/activity-form-fields";
 import { updateActivity, deleteActivity } from "@/actions/activities";
 import { getLeetcodeUsername } from "@/actions/leetcode";
+import { getGfgUsername } from "@/actions/gfg";
 import type { Activity, ActivityFormInput } from "@/lib/types";
 
-function toFormInput(activity: Activity, leetcodeUsername = ""): ActivityFormInput {
+function toFormInput(
+  activity: Activity,
+  leetcodeUsername = "",
+  gfgUsername = ""
+): ActivityFormInput {
+  const automation_type =
+    activity.automation_type === "leetcode_potd" || activity.automation_type === "gfg_potd"
+      ? activity.automation_type
+      : "none";
   return {
     name: activity.name,
     description: activity.description ?? "",
@@ -20,8 +29,9 @@ function toFormInput(activity: Activity, leetcodeUsername = ""): ActivityFormInp
     completion_type: activity.completion_type,
     target_value: activity.target_value,
     unit_label: activity.unit_label ?? "",
-    automation_type: activity.automation_type === "leetcode_potd" ? "leetcode_potd" : "none",
+    automation_type,
     leetcode_username: leetcodeUsername,
+    gfg_username: gfgUsername,
   };
 }
 
@@ -38,6 +48,8 @@ export function EditActivityDialog({ activity }: { activity: Activity }) {
       getLeetcodeUsername(activity.id).then((username) =>
         setValue(toFormInput(activity, username))
       );
+    } else if (activity.automation_type === "gfg_potd") {
+      getGfgUsername(activity.id).then((username) => setValue(toFormInput(activity, "", username)));
     } else {
       setValue(toFormInput(activity));
     }

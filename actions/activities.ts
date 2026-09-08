@@ -12,6 +12,8 @@ export async function createActivity(input: ActivityFormInput) {
   if (!user) throw new Error("Not authenticated");
 
   const isLeetcode = input.automation_type === "leetcode_potd";
+  const isGfg = input.automation_type === "gfg_potd";
+  const isAutomated = isLeetcode || isGfg;
 
   const { data: activity, error } = await supabase
     .from("activities")
@@ -21,20 +23,20 @@ export async function createActivity(input: ActivityFormInput) {
       description: input.description.trim() || null,
       icon: input.icon.trim() || "\u2713",
       color: input.color || "#3F6B47",
-      period: isLeetcode ? "daily" : input.period,
+      period: isAutomated ? "daily" : input.period,
       schedule_day_of_week:
-        !isLeetcode && (input.period === "weekly" || input.period === "biweekly")
+        !isAutomated && (input.period === "weekly" || input.period === "biweekly")
           ? input.schedule_day_of_week
           : null,
       schedule_day_of_month:
-        !isLeetcode && input.period === "monthly" ? input.schedule_day_of_month : null,
-      anchor_date: !isLeetcode && input.period === "biweekly" ? input.anchor_date : null,
-      completion_type: isLeetcode ? "boolean" : input.completion_type,
-      target_value: !isLeetcode && input.completion_type === "count" ? input.target_value : null,
+        !isAutomated && input.period === "monthly" ? input.schedule_day_of_month : null,
+      anchor_date: !isAutomated && input.period === "biweekly" ? input.anchor_date : null,
+      completion_type: isAutomated ? "boolean" : input.completion_type,
+      target_value: !isAutomated && input.completion_type === "count" ? input.target_value : null,
       unit_label:
-        !isLeetcode && input.completion_type === "count" ? input.unit_label.trim() || null : null,
-      is_automated: isLeetcode,
-      automation_type: isLeetcode ? "leetcode_potd" : null,
+        !isAutomated && input.completion_type === "count" ? input.unit_label.trim() || null : null,
+      is_automated: isAutomated,
+      automation_type: isAutomated ? input.automation_type : null,
     })
     .select("id")
     .single();
@@ -48,6 +50,15 @@ export async function createActivity(input: ActivityFormInput) {
       activity_id: activity.id,
       user_id: user.id,
       leetcode_username: username,
+    });
+    if (configError) throw new Error(configError.message);
+  } else if (isGfg) {
+    const username = input.gfg_username.trim();
+    if (!username) throw new Error("GFG username is required");
+    const { error: configError } = await supabase.from("gfg_potd_config").insert({
+      activity_id: activity.id,
+      user_id: user.id,
+      gfg_username: username,
     });
     if (configError) throw new Error(configError.message);
   }
@@ -64,6 +75,8 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
   if (!user) throw new Error("Not authenticated");
 
   const isLeetcode = input.automation_type === "leetcode_potd";
+  const isGfg = input.automation_type === "gfg_potd";
+  const isAutomated = isLeetcode || isGfg;
 
   const { error } = await supabase
     .from("activities")
@@ -72,20 +85,20 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
       description: input.description.trim() || null,
       icon: input.icon.trim() || "\u2713",
       color: input.color || "#3F6B47",
-      period: isLeetcode ? "daily" : input.period,
+      period: isAutomated ? "daily" : input.period,
       schedule_day_of_week:
-        !isLeetcode && (input.period === "weekly" || input.period === "biweekly")
+        !isAutomated && (input.period === "weekly" || input.period === "biweekly")
           ? input.schedule_day_of_week
           : null,
       schedule_day_of_month:
-        !isLeetcode && input.period === "monthly" ? input.schedule_day_of_month : null,
-      anchor_date: !isLeetcode && input.period === "biweekly" ? input.anchor_date : null,
-      completion_type: isLeetcode ? "boolean" : input.completion_type,
-      target_value: !isLeetcode && input.completion_type === "count" ? input.target_value : null,
+        !isAutomated && input.period === "monthly" ? input.schedule_day_of_month : null,
+      anchor_date: !isAutomated && input.period === "biweekly" ? input.anchor_date : null,
+      completion_type: isAutomated ? "boolean" : input.completion_type,
+      target_value: !isAutomated && input.completion_type === "count" ? input.target_value : null,
       unit_label:
-        !isLeetcode && input.completion_type === "count" ? input.unit_label.trim() || null : null,
-      is_automated: isLeetcode,
-      automation_type: isLeetcode ? "leetcode_potd" : null,
+        !isAutomated && input.completion_type === "count" ? input.unit_label.trim() || null : null,
+      is_automated: isAutomated,
+      automation_type: isAutomated ? input.automation_type : null,
     })
     .eq("id", id)
     .eq("user_id", user.id);
@@ -102,8 +115,21 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
         { onConflict: "activity_id" }
       );
     if (configError) throw new Error(configError.message);
+    await supabase.from("gfg_potd_config").delete().eq("activity_id", id);
+  } else if (isGfg) {
+    const username = input.gfg_username.trim();
+    if (!username) throw new Error("GFG username is required");
+    const { error: configError } = await supabase
+      .from("gfg_potd_config")
+      .upsert(
+        { activity_id: id, user_id: user.id, gfg_username: username },
+        { onConflict: "activity_id" }
+      );
+    if (configError) throw new Error(configError.message);
+    await supabase.from("leetcode_potd_config").delete().eq("activity_id", id);
   } else {
     await supabase.from("leetcode_potd_config").delete().eq("activity_id", id);
+    await supabase.from("gfg_potd_config").delete().eq("activity_id", id);
   }
 
   revalidatePath("/");

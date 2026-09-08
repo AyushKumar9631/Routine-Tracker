@@ -4,10 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { Nav } from "@/components/nav";
 import { EditActivityDialog } from "@/components/edit-activity-dialog";
 import { LeetcodeSyncButton } from "@/components/leetcode-sync-button";
+import { GfgSyncButton } from "@/components/gfg-sync-button";
 import { StatPill } from "@/components/stat-pill";
 import { CompletionHeatmap } from "@/components/completion-heatmap";
 import { EmptyState } from "@/components/empty-state";
-import type { Activity, Completion, LeetCodeConfig } from "@/lib/types";
+import type { Activity, Completion, LeetCodeConfig, GfgConfig } from "@/lib/types";
 import { calcCompletionRate, calcStreak, formatDateKey, parseDateKey, scheduleLabel } from "@/lib/utils";
 
 export default async function ActivityDetailPage({
@@ -46,6 +47,16 @@ export default async function ActivityDetailPage({
     leetcodeConfig = data as LeetCodeConfig | null;
   }
 
+  let gfgConfig: GfgConfig | null = null;
+  if (typedActivity.automation_type === "gfg_potd") {
+    const { data } = await supabase
+      .from("gfg_potd_config")
+      .select("*")
+      .eq("activity_id", id)
+      .maybeSingle();
+    gfgConfig = data as GfgConfig | null;
+  }
+
   const streak = calcStreak(typedActivity, completions);
   const rate30 = calcCompletionRate(typedActivity, completions, 30);
   const totalDone = completions.filter((c) => c.completed).length;
@@ -76,9 +87,18 @@ export default async function ActivityDetailPage({
                   ` \u00b7 last checked ${new Date(leetcodeConfig.last_checked_at).toLocaleString()}`}
               </p>
             )}
+            {gfgConfig && (
+              <p className="mt-2 text-xs text-ink-soft">
+                Auto-tracked via GFG &middot; @{gfgConfig.gfg_username}
+                {gfgConfig.last_known_streak !== null && ` \u00b7 streak ${gfgConfig.last_known_streak}`}
+                {gfgConfig.last_checked_at &&
+                  ` \u00b7 last checked ${new Date(gfgConfig.last_checked_at).toLocaleString()}`}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {leetcodeConfig && <LeetcodeSyncButton activityId={typedActivity.id} />}
+            {gfgConfig && <GfgSyncButton activityId={typedActivity.id} />}
             <EditActivityDialog activity={typedActivity} />
           </div>
         </div>
