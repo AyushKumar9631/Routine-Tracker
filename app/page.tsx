@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Nav } from "@/components/nav";
 import { ActivityRow } from "@/components/activity-row";
@@ -8,6 +9,11 @@ import { formatDayLabel, isDueOn, todayKey } from "@/lib/utils";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const needsPassword = Boolean(user) && !user?.user_metadata?.has_password;
 
   const { data: activities } = await supabase
     .from("activities")
@@ -41,6 +47,18 @@ export default async function DashboardPage() {
       <Nav />
 
       <main className="mx-auto max-w-3xl px-6 py-10">
+        {needsPassword && (
+          <div className="mb-8 flex items-center justify-between gap-4 rounded border border-amber/40 bg-amber-soft px-4 py-3 text-sm text-ink">
+            <span>You're signed in via a one-time link. Set a password to skip the email step next time.</span>
+            <Link
+              href="/account/set-password"
+              className="shrink-0 whitespace-nowrap font-medium text-ink underline underline-offset-2 hover:text-moss"
+            >
+              Set password
+            </Link>
+          </div>
+        )}
+
         <div className="mb-8 flex items-end justify-between">
           <div>
             <p className="text-sm text-ink-soft">{formatDayLabel(today)}</p>
