@@ -23,7 +23,8 @@ export function ActivityRow({
   const isDone = completion?.completed ?? false;
   const isLeetcode = activity.is_automated && activity.automation_type === "leetcode_potd";
   const isGfg = activity.is_automated && activity.automation_type === "gfg_potd";
-  const isAutomated = isLeetcode || isGfg;
+  const isScreenTime = activity.is_automated && activity.automation_type === "screen_time";
+  const isAutomated = isLeetcode || isGfg || isScreenTime;
 
   function toggleBoolean() {
     startTransition(async () => {
@@ -72,6 +73,12 @@ export function ActivityRow({
         )}
         {isLeetcode && <p className="mt-0.5 text-xs text-ink-soft">Auto-tracked via LeetCode</p>}
         {isGfg && <p className="mt-0.5 text-xs text-ink-soft">Auto-tracked via GFG</p>}
+        {isScreenTime && (
+          <p className="mt-0.5 text-xs text-ink-soft">
+            Auto-tracked via Screen Time (iPhone)
+            {completion?.value != null ? ` \u00b7 ${completion.value} min today` : ""}
+          </p>
+        )}
       </div>
 
       {isLeetcode && <LeetcodeSyncButton activityId={activity.id} compact />}

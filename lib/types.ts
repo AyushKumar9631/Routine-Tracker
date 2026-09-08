@@ -50,6 +50,17 @@ export interface GfgConfig {
   updated_at: string;
 }
 
+export interface ScreentimeConfig {
+  id: string;
+  activity_id: string;
+  user_id: string;
+  platform: "ios" | "android";
+  token: string;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Completion {
   id: string;
   activity_id: string;
@@ -75,9 +86,10 @@ export interface ActivityFormInput {
   target_value: number | null;
   unit_label: string;
 
-  automation_type: "none" | "leetcode_potd" | "gfg_potd";
+  automation_type: "none" | "leetcode_potd" | "gfg_potd" | "screen_time";
   leetcode_username: string;
   gfg_username: string;
+  screentime_platform: "ios" | "android" | null;
 }
 
 export const DAY_NAMES = [

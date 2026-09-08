@@ -2,6 +2,7 @@
 
 import type { ActivityFormInput, CompletionType, Period } from "@/lib/types";
 import { DAY_NAMES } from "@/lib/types";
+import { ScreentimeSetupPanel } from "@/components/screentime-setup-panel";
 
 export function ActivityFormFields({
   value,
@@ -12,7 +13,8 @@ export function ActivityFormFields({
 }) {
   const isLeetcode = value.automation_type === "leetcode_potd";
   const isGfg = value.automation_type === "gfg_potd";
-  const isAutomated = isLeetcode || isGfg;
+  const isScreenTime = value.automation_type === "screen_time";
+  const isAutomated = isLeetcode || isGfg || isScreenTime;
 
   return (
     <div className="space-y-4">
@@ -54,17 +56,27 @@ export function ActivityFormFields({
           className="field-input"
           value={value.automation_type}
           onChange={(e) => {
-            const automation_type = e.target.value as "none" | "leetcode_potd" | "gfg_potd";
-            onChange(
-              automation_type === "none"
-                ? { automation_type }
-                : { automation_type, period: "daily", completion_type: "boolean" }
-            );
+            const automation_type = e.target.value as ActivityFormInput["automation_type"];
+            if (automation_type === "none") {
+              onChange({ automation_type });
+            } else if (automation_type === "screen_time") {
+              onChange({
+                automation_type,
+                period: "daily",
+                completion_type: "count",
+                unit_label: "min",
+                target_value: null,
+                screentime_platform: null,
+              });
+            } else {
+              onChange({ automation_type, period: "daily", completion_type: "boolean" });
+            }
           }}
         >
           <option value="none">None &mdash; log it myself</option>
           <option value="leetcode_potd">LeetCode Daily Challenge</option>
           <option value="gfg_potd">GFG Problem of the Day</option>
+          <option value="screen_time">Smartphone Screen Time</option>
         </select>
       </div>
 
@@ -101,6 +113,64 @@ export function ActivityFormFields({
             baseline, and it starts marking itself complete from the next streak
             increase onward.
           </p>
+        </div>
+      )}
+
+      {isScreenTime && (
+        <div>
+          <label className="field-label">Phone</label>
+          <select
+            className="field-input"
+            required
+            value={value.screentime_platform ?? ""}
+            onChange={(e) =>
+              onChange({ screentime_platform: e.target.value as "ios" | "android" })
+            }
+          >
+            <option value="" disabled>
+              Choose your phone&hellip;
+            </option>
+            <option value="ios">iPhone</option>
+            <option value="android" disabled>
+              Android &mdash; coming soon
+            </option>
+          </select>
+
+          {value.screentime_platform === "ios" ? (
+            <p className="mt-1 text-xs text-ink-soft">
+              Uses the Jomo app + an iOS Shortcut to push your daily screen time here. The
+              webhook link shows up on this activity&apos;s page once it&apos;s saved.{" "}
+              <ScreentimeSetupPanel
+                triggerLabel="Preview the setup steps"
+                triggerClassName="underline underline-offset-2 hover:text-ink"
+              />
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-amber">
+              Android screen time automation isn&apos;t built yet &mdash; iPhone is the only
+              option for now.
+            </p>
+          )}
+
+          <div className="mt-3">
+            <label className="field-label">Daily budget, in minutes (optional)</label>
+            <input
+              type="number"
+              min={1}
+              className="field-input"
+              placeholder="e.g. 120"
+              value={value.target_value ?? ""}
+              onChange={(e) =>
+                onChange({
+                  target_value: e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+            />
+            <p className="mt-1 text-xs text-ink-soft">
+              Shown for reference on the activity page &mdash; every synced day is logged as
+              done, whether or not it&apos;s under budget.
+            </p>
+          </div>
         </div>
       )}
 

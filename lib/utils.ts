@@ -158,5 +158,19 @@ export function defaultActivityForm(): import("@/lib/types").ActivityFormInput {
     automation_type: "none",
     leetcode_username: "",
     gfg_username: "",
+    screentime_platform: null,
   };
+}
+
+/** Coarse "3h ago" / "2d ago" style label for sync timestamps. */
+export function formatRelativeTime(iso: string | null): string {
+  if (!iso) return "Never synced yet";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.round(diffMs / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
 }

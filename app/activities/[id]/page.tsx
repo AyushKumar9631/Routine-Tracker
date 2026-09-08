@@ -5,10 +5,11 @@ import { Nav } from "@/components/nav";
 import { EditActivityDialog } from "@/components/edit-activity-dialog";
 import { LeetcodeSyncButton } from "@/components/leetcode-sync-button";
 import { GfgSyncButton } from "@/components/gfg-sync-button";
+import { ScreentimeWebhookCard } from "@/components/screentime-webhook-card";
 import { StatPill } from "@/components/stat-pill";
 import { CompletionHeatmap } from "@/components/completion-heatmap";
 import { EmptyState } from "@/components/empty-state";
-import type { Activity, Completion, LeetCodeConfig, GfgConfig } from "@/lib/types";
+import type { Activity, Completion, LeetCodeConfig, GfgConfig, ScreentimeConfig } from "@/lib/types";
 import { calcCompletionRate, calcStreak, formatDateKey, parseDateKey, scheduleLabel } from "@/lib/utils";
 
 export default async function ActivityDetailPage({
@@ -57,6 +58,16 @@ export default async function ActivityDetailPage({
     gfgConfig = data as GfgConfig | null;
   }
 
+  let screentimeConfig: ScreentimeConfig | null = null;
+  if (typedActivity.automation_type === "screen_time") {
+    const { data } = await supabase
+      .from("screentime_config")
+      .select("*")
+      .eq("activity_id", id)
+      .maybeSingle();
+    screentimeConfig = data as ScreentimeConfig | null;
+  }
+
   const streak = calcStreak(typedActivity, completions);
   const rate30 = calcCompletionRate(typedActivity, completions, 30);
   const totalDone = completions.filter((c) => c.completed).length;
@@ -103,6 +114,16 @@ export default async function ActivityDetailPage({
           </div>
         </div>
 
+        {screentimeConfig && (
+          <div className="mb-10">
+            <ScreentimeWebhookCard
+              activityId={typedActivity.id}
+              token={screentimeConfig.token}
+              lastSyncedAt={screentimeConfig.last_synced_at}
+            />
+          </div>
+        )}
+
         <div className="mb-10 grid grid-cols-3 gap-3">
           <StatPill label="current streak" value={String(streak)} />
           <StatPill label="last 30 days" value={`${rate30}%`} />
@@ -139,9 +160,9 @@ export default async function ActivityDetailPage({
                   </span>
                   <span className={c.completed ? "text-moss" : "text-rust"}>
                     {typedActivity.completion_type === "count"
-                      ? `${c.value ?? 0} / ${typedActivity.target_value}${
-                          typedActivity.unit_label ? ` ${typedActivity.unit_label}` : ""
-                        }`
+                      ? `${c.value ?? 0}${
+                          typedActivity.target_value ? ` / ${typedActivity.target_value}` : ""
+                        }${typedActivity.unit_label ? ` ${typedActivity.unit_label}` : ""}`
                       : c.completed
                       ? "Done"
                       : "Not done"}

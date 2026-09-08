@@ -35,11 +35,13 @@ export function ActivityListItem({ activity }: { activity: Activity }) {
         <p className="mt-0.5 text-xs text-ink-soft">
           {scheduleLabel(activity)}
           {activity.completion_type === "count" &&
+            activity.target_value != null &&
             ` \u00b7 target ${activity.target_value}${
               activity.unit_label ? ` ${activity.unit_label}` : ""
             }`}
           {activity.automation_type === "leetcode_potd" && " \u00b7 auto \u00b7 LeetCode"}
           {activity.automation_type === "gfg_potd" && " \u00b7 auto \u00b7 GFG"}
+          {activity.automation_type === "screen_time" && " \u00b7 auto \u00b7 Screen Time (iPhone)"}
         </p>
       </div>
 
