@@ -32,7 +32,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     // text body ("3h 24m") depending on how the user wired it up.
   }
 
-  const minutes = parseScreenTimeMinutes(extractScreenTimeValue(payload));
+  const extracted = extractScreenTimeValue(payload);
+  const minutes = parseScreenTimeMinutes(extracted);
+
+  // Temporary debug logging — check Vercel's function logs for this route to
+  // see exactly what the Shortcut is sending. Safe to remove once the
+  // parsing/value is confirmed correct; it only logs the screen-time value,
+  // nothing sensitive.
+  console.log("[screentime] raw body:", rawText.slice(0, 500));
+  console.log("[screentime] extracted value:", extracted, "-> parsed minutes:", minutes);
 
   await supabase
     .from("screentime_config")
@@ -40,7 +48,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     .eq("id", config.id);
 
   if (minutes === null) {
-    return NextResponse.json({ ok: false, reason: "unrecognized value" }, { status: 200 });
+    return NextResponse.json(
+      { ok: false, reason: "unrecognized value", raw: rawText.slice(0, 200), extracted },
+      { status: 200 }
+    );
   }
 
   const { error } = await supabase.from("completions").upsert(
@@ -62,5 +73,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     console.error("screentime ingest: completions upsert failed", error.message);
   }
 
-  return NextResponse.json({ ok: true, minutes });
+  return NextResponse.json({ ok: true, minutes, raw: rawText.slice(0, 200), extracted });
 }
