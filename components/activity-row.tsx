@@ -81,8 +81,8 @@ export function ActivityRow({
         )}
       </div>
 
-      {isLeetcode && <LeetcodeSyncButton activityId={activity.id} compact />}
-      {isGfg && <GfgSyncButton activityId={activity.id} compact />}
+      {isLeetcode && <LeetcodeSyncButton activityId={activity.id} compact autoSyncActive={!isDone} />}
+      {isGfg && <GfgSyncButton activityId={activity.id} compact autoSyncActive={!isDone} />}
 
       {!isAutomated && activity.completion_type === "count" && (
         <div className="flex shrink-0 items-center gap-2 font-mono text-sm">

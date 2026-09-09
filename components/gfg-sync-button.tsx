@@ -1,29 +1,74 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { syncGfgPotdNow } from "@/actions/gfg";
+import { AUTO_SYNC_POLL_MS } from "@/lib/sync-config";
 import { cn } from "@/lib/utils";
 
 export function GfgSyncButton({
   activityId,
   compact = false,
+  autoSyncActive = false,
 }: {
   activityId: string;
   compact?: boolean;
+  /** Pass true while today isn't marked solved yet — runs a background poll every ~15s. */
+  autoSyncActive?: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const [solved, setSolved] = useState(false);
+  const runningRef = useRef(false);
+
+  function runSync() {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    startTransition(async () => {
+      try {
+        const result = await syncGfgPotdNow(activityId);
+        if (!result.ok) {
+          setMessage(result.error);
+          return;
+        }
+        setMessage(result.solvedToday ? "Solved \u2713" : `Streak: ${result.currentStreak}`);
+        if (result.solvedToday) setSolved(true);
+      } finally {
+        runningRef.current = false;
+      }
+    });
+  }
+
+  // Auto-poll in the background while this activity isn't solved for today.
+  // Stops the moment a check comes back solved, and pauses (without
+  // dropping the schedule) while the tab isn't visible.
+  useEffect(() => {
+    if (!autoSyncActive || solved) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    function schedule() {
+      timer = setTimeout(tick, AUTO_SYNC_POLL_MS);
+    }
+
+    function tick() {
+      if (cancelled) return;
+      if (!document.hidden) runSync();
+      schedule();
+    }
+
+    schedule();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSyncActive, solved, activityId]);
 
   function handleClick() {
     setMessage(null);
-    startTransition(async () => {
-      const result = await syncGfgPotdNow(activityId);
-      if (!result.ok) {
-        setMessage(result.error);
-        return;
-      }
-      setMessage(result.solvedToday ? "Solved \u2713" : `Streak: ${result.currentStreak}`);
-    });
+    runSync();
   }
 
   return (

@@ -10,7 +10,7 @@ import { StatPill } from "@/components/stat-pill";
 import { CompletionHeatmap } from "@/components/completion-heatmap";
 import { EmptyState } from "@/components/empty-state";
 import type { Activity, Completion, LeetCodeConfig, GfgConfig, ScreentimeConfig } from "@/lib/types";
-import { calcCompletionRate, calcStreak, formatDateKey, parseDateKey, scheduleLabel } from "@/lib/utils";
+import { calcCompletionRate, calcStreak, formatDateKey, parseDateKey, scheduleLabel, todayKey } from "@/lib/utils";
 
 export default async function ActivityDetailPage({
   params,
@@ -71,6 +71,7 @@ export default async function ActivityDetailPage({
   const streak = calcStreak(typedActivity, completions);
   const rate30 = calcCompletionRate(typedActivity, completions, 30);
   const totalDone = completions.filter((c) => c.completed).length;
+  const isDoneToday = completions.some((c) => c.period_key === todayKey() && c.completed);
 
   return (
     <div className="min-h-screen">
@@ -108,8 +109,8 @@ export default async function ActivityDetailPage({
             )}
           </div>
           <div className="flex items-center gap-3">
-            {leetcodeConfig && <LeetcodeSyncButton activityId={typedActivity.id} />}
-            {gfgConfig && <GfgSyncButton activityId={typedActivity.id} />}
+            {leetcodeConfig && <LeetcodeSyncButton activityId={typedActivity.id} autoSyncActive={!isDoneToday} />}
+            {gfgConfig && <GfgSyncButton activityId={typedActivity.id} autoSyncActive={!isDoneToday} />}
             <EditActivityDialog activity={typedActivity} />
           </div>
         </div>
