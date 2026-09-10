@@ -66,6 +66,7 @@ export async function createActivity(input: ActivityFormInput) {
       activity_id: activity.id,
       user_id: user.id,
       leetcode_username: username,
+      preferred_complete_by: input.preferred_complete_by || null,
     });
     if (configError) throw new Error(configError.message);
   } else if (isGfg) {
@@ -151,7 +152,12 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
     const { error: configError } = await supabase
       .from("leetcode_potd_config")
       .upsert(
-        { activity_id: id, user_id: user.id, leetcode_username: username },
+        {
+          activity_id: id,
+          user_id: user.id,
+          leetcode_username: username,
+          preferred_complete_by: input.preferred_complete_by || null,
+        },
         { onConflict: "activity_id" }
       );
     if (configError) throw new Error(configError.message);

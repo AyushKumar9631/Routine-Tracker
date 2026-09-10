@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { syncLeetcodeActivity } from "@/lib/leetcode-sync";
 
-export async function getLeetcodeUsername(activityId: string): Promise<string> {
+export async function getLeetcodeConfig(
+  activityId: string
+): Promise<{ leetcode_username: string; preferred_complete_by: string | null }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -13,12 +15,15 @@ export async function getLeetcodeUsername(activityId: string): Promise<string> {
 
   const { data } = await supabase
     .from("leetcode_potd_config")
-    .select("leetcode_username")
+    .select("leetcode_username, preferred_complete_by")
     .eq("activity_id", activityId)
     .eq("user_id", user.id)
     .maybeSingle();
 
-  return data?.leetcode_username ?? "";
+  return {
+    leetcode_username: data?.leetcode_username ?? "",
+    preferred_complete_by: data?.preferred_complete_by ?? null,
+  };
 }
 
 export async function syncLeetcodePotdNow(activityId: string) {

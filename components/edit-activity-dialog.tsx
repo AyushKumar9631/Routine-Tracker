@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { ActivityFormFields } from "@/components/activity-form-fields";
 import { updateActivity, deleteActivity } from "@/actions/activities";
-import { getLeetcodeUsername } from "@/actions/leetcode";
+import { getLeetcodeConfig } from "@/actions/leetcode";
 import { getGfgUsername } from "@/actions/gfg";
 import { getScreentimeConfig } from "@/actions/screentime";
 import type { Activity, ActivityFormInput } from "@/lib/types";
@@ -13,7 +13,8 @@ function toFormInput(
   activity: Activity,
   leetcodeUsername = "",
   gfgUsername = "",
-  screentimePlatform: "ios" | "android" | null = null
+  screentimePlatform: "ios" | "android" | null = null,
+  preferredCompleteBy: string | null = null
 ): ActivityFormInput {
   const automation_type =
     activity.automation_type === "leetcode_potd" ||
@@ -35,6 +36,7 @@ function toFormInput(
     unit_label: activity.unit_label ?? "",
     automation_type,
     leetcode_username: leetcodeUsername,
+    preferred_complete_by: preferredCompleteBy,
     gfg_username: gfgUsername,
     screentime_platform: screentimePlatform,
   };
@@ -50,8 +52,10 @@ export function EditActivityDialog({ activity }: { activity: Activity }) {
   function openDialog() {
     setOpen(true);
     if (activity.automation_type === "leetcode_potd") {
-      getLeetcodeUsername(activity.id).then((username) =>
-        setValue(toFormInput(activity, username))
+      getLeetcodeConfig(activity.id).then((config) =>
+        setValue(
+          toFormInput(activity, config.leetcode_username, "", null, config.preferred_complete_by)
+        )
       );
     } else if (activity.automation_type === "gfg_potd") {
       getGfgUsername(activity.id).then((username) => setValue(toFormInput(activity, "", username)));

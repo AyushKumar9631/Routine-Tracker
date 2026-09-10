@@ -73,6 +73,25 @@ export function nextDueDate(activity: Activity, from: Date = new Date()): Date |
   return null;
 }
 
+/**
+ * The deadline for the period-instance of `activity` due on `from`'s
+ * calendar date: midnight at the end of that day, local time. Applies to
+ * any period (not just daily) — whatever's due today is due by tonight.
+ * Returns null if the activity isn't due on that date at all.
+ */
+export function deadlineFor(activity: Activity, from: Date = new Date()): Date | null {
+  if (!isDueOn(activity, from)) return null;
+  const midnight = new Date(from);
+  midnight.setHours(24, 0, 0, 0); // rolls over to the start of tomorrow
+  return midnight;
+}
+
+/** Milliseconds remaining until `deadlineFor(activity, from)`; null if not due on that date. */
+export function msUntilDeadline(activity: Activity, from: Date = new Date()): number | null {
+  const deadline = deadlineFor(activity, from);
+  return deadline ? deadline.getTime() - from.getTime() : null;
+}
+
 export function scheduleLabel(activity: Activity): string {
   switch (activity.period) {
     case "daily":
@@ -157,6 +176,7 @@ export function defaultActivityForm(): import("@/lib/types").ActivityFormInput {
     unit_label: "",
     automation_type: "none",
     leetcode_username: "",
+    preferred_complete_by: null,
     gfg_username: "",
     screentime_platform: null,
   };

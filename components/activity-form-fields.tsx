@@ -94,6 +94,22 @@ export function ActivityFormFields({
             Public profile only &mdash; no password needed. Runs daily and marks itself
             complete once you&apos;ve solved today&apos;s problem.
           </p>
+
+          <div className="mt-3">
+            <label className="field-label">Complete by (optional)</label>
+            <input
+              type="time"
+              className="field-input"
+              value={value.preferred_complete_by ?? ""}
+              onChange={(e) =>
+                onChange({ preferred_complete_by: e.target.value === "" ? null : e.target.value })
+              }
+            />
+            <p className="mt-1 text-xs text-ink-soft">
+              Get a nudge if it&apos;s still unsolved by this time. Leave blank to default to
+              2 hours before the midnight deadline.
+            </p>
+          </div>
         </div>
       )}
 

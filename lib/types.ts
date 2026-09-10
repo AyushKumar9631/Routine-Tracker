@@ -31,6 +31,8 @@ export interface LeetCodeConfig {
   activity_id: string;
   user_id: string;
   leetcode_username: string;
+  preferred_complete_by: string | null; // "HH:MM:SS", Asia/Kolkata wall clock
+  last_notified_on: string | null; // date, set once a deadline notification has sent today
   last_checked_at: string | null;
   last_synced_date: string | null;
   last_question_slug: string | null;
@@ -88,6 +90,7 @@ export interface ActivityFormInput {
 
   automation_type: "none" | "leetcode_potd" | "gfg_potd" | "screen_time";
   leetcode_username: string;
+  preferred_complete_by: string | null; // "HH:MM" from a <input type="time">, LeetCode only
   gfg_username: string;
   screentime_platform: "ios" | "android" | null;
 }

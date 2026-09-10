@@ -5,6 +5,7 @@ import Link from "next/link";
 import { logCompletion } from "@/actions/completions";
 import { LeetcodeSyncButton } from "@/components/leetcode-sync-button";
 import { GfgSyncButton } from "@/components/gfg-sync-button";
+import { DeadlineCountdown } from "@/components/deadline-countdown";
 import type { Activity, Completion } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -12,10 +13,12 @@ export function ActivityRow({
   activity,
   completion,
   periodKey,
+  deadline = null,
 }: {
   activity: Activity;
   completion: Completion | null;
   periodKey: string;
+  deadline?: string | null;
 }) {
   const [isPending, startTransition] = useTransition();
   const [count, setCount] = useState<number>(completion?.value ?? 0);
@@ -80,6 +83,8 @@ export function ActivityRow({
           </p>
         )}
       </div>
+
+      {!isDone && <DeadlineCountdown deadline={deadline} />}
 
       {isLeetcode && <LeetcodeSyncButton activityId={activity.id} compact autoSyncActive={!isDone} />}
       {isGfg && <GfgSyncButton activityId={activity.id} compact autoSyncActive={!isDone} />}

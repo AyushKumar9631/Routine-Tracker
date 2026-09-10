@@ -5,7 +5,7 @@ import { ActivityRow } from "@/components/activity-row";
 import { AddActivityDialog } from "@/components/add-activity-dialog";
 import { EmptyState } from "@/components/empty-state";
 import type { Activity, Completion } from "@/lib/types";
-import { formatDayLabel, isDueOn, todayKey } from "@/lib/utils";
+import { deadlineFor, formatDayLabel, isDueOn, msUntilDeadline, todayKey } from "@/lib/utils";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -41,6 +41,11 @@ export default async function DashboardPage() {
 
   const completionByActivity = new Map(completions.map((c) => [c.activity_id, c]));
   const doneCount = dueToday.filter((a) => completionByActivity.get(a.id)?.completed).length;
+
+  const uncompletedToday = dueToday
+    .filter((a) => !completionByActivity.get(a.id)?.completed)
+    .sort((a, b) => (msUntilDeadline(a, today) ?? Infinity) - (msUntilDeadline(b, today) ?? Infinity));
+  const completedToday = dueToday.filter((a) => completionByActivity.get(a.id)?.completed);
 
   return (
     <div className="min-h-screen">
@@ -83,16 +88,37 @@ export default async function DashboardPage() {
             description="Nothing is scheduled for today. Check Activities to see what's coming up."
           />
         ) : (
-          <ul>
-            {dueToday.map((activity) => (
-              <ActivityRow
-                key={activity.id}
-                activity={activity}
-                completion={completionByActivity.get(activity.id) ?? null}
-                periodKey={key}
-              />
-            ))}
-          </ul>
+          <>
+            <ul>
+              {uncompletedToday.map((activity) => (
+                <ActivityRow
+                  key={activity.id}
+                  activity={activity}
+                  completion={completionByActivity.get(activity.id) ?? null}
+                  periodKey={key}
+                  deadline={deadlineFor(activity, today)?.toISOString() ?? null}
+                />
+              ))}
+            </ul>
+
+            {completedToday.length > 0 && (
+              <div className="mt-8">
+                <h2 className="mb-2 text-xs uppercase tracking-wide text-ink-soft">
+                  Completed &middot; {completedToday.length}
+                </h2>
+                <ul>
+                  {completedToday.map((activity) => (
+                    <ActivityRow
+                      key={activity.id}
+                      activity={activity}
+                      completion={completionByActivity.get(activity.id) ?? null}
+                      periodKey={key}
+                    />
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
