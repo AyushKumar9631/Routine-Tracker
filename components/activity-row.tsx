@@ -5,9 +5,16 @@ import Link from "next/link";
 import { logCompletion } from "@/actions/completions";
 import { LeetcodeSyncButton } from "@/components/leetcode-sync-button";
 import { GfgSyncButton } from "@/components/gfg-sync-button";
-import { DeadlineCountdown } from "@/components/deadline-countdown";
+import { DeadlineBadge, useDeadlineCountdown, type Urgency } from "@/components/deadline-countdown";
 import type { Activity, Completion } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+const URGENCY_RULE: Record<Urgency, string> = {
+  safe: "border-l-moss",
+  warn: "border-l-amber",
+  danger: "border-l-rust",
+  over: "border-l-rust",
+};
 
 export function ActivityRow({
   activity,
@@ -22,6 +29,7 @@ export function ActivityRow({
 }) {
   const [isPending, startTransition] = useTransition();
   const [count, setCount] = useState<number>(completion?.value ?? 0);
+  const { msLeft, urgency } = useDeadlineCountdown(deadline);
 
   const isDone = completion?.completed ?? false;
   const isLeetcode = activity.is_automated && activity.automation_type === "leetcode_potd";
@@ -47,7 +55,12 @@ export function ActivityRow({
   }
 
   return (
-    <li className="flex items-center gap-4 border-b border-line py-4 last:border-b-0">
+    <li
+      className={cn(
+        "flex items-center gap-4 border-b border-l-[3px] border-line py-4 pl-3 pr-1 last:border-b-0 transition-colors",
+        isDone ? "border-l-transparent opacity-70" : urgency ? URGENCY_RULE[urgency] : "border-l-transparent"
+      )}
+    >
       <button
         type="button"
         onClick={activity.completion_type === "boolean" && !isAutomated ? toggleBoolean : undefined}
@@ -66,7 +79,10 @@ export function ActivityRow({
       <div className="min-w-0 flex-1">
         <Link
           href={`/activities/${activity.id}`}
-          className="block truncate text-sm text-ink hover:underline underline-offset-2"
+          className={cn(
+            "block truncate text-sm hover:underline underline-offset-2",
+            isDone ? "text-ink-soft line-through decoration-ink-soft/50" : "text-ink"
+          )}
         >
           <span className="mr-1">{activity.icon}</span>
           {activity.name}
@@ -84,7 +100,7 @@ export function ActivityRow({
         )}
       </div>
 
-      {!isDone && <DeadlineCountdown deadline={deadline} />}
+      {!isDone && <DeadlineBadge msLeft={msLeft} urgency={urgency} />}
 
       {isLeetcode && <LeetcodeSyncButton activityId={activity.id} compact autoSyncActive={!isDone} />}
       {isGfg && <GfgSyncButton activityId={activity.id} compact autoSyncActive={!isDone} />}

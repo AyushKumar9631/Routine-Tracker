@@ -4,13 +4,17 @@ import type { ActivityFormInput, CompletionType, Period } from "@/lib/types";
 import { DAY_NAMES } from "@/lib/types";
 import { ScreentimeSetupPanel } from "@/components/screentime-setup-panel";
 import { DEFAULT_NOTIFICATION_TEMPLATE } from "@/lib/notification-template";
+import { automationDefaults } from "@/lib/utils";
 
 export function ActivityFormFields({
   value,
   onChange,
+  hideAutomationPicker = false,
 }: {
   value: ActivityFormInput;
   onChange: (patch: Partial<ActivityFormInput>) => void;
+  /** Skip the "Automation" dropdown — used once a template has already fixed it. */
+  hideAutomationPicker?: boolean;
 }) {
   const isLeetcode = value.automation_type === "leetcode_potd";
   const isGfg = value.automation_type === "gfg_potd";
@@ -51,35 +55,24 @@ export function ActivityFormFields({
         />
       </div>
 
-      <div>
-        <label className="field-label">Automation</label>
-        <select
-          className="field-input"
-          value={value.automation_type}
-          onChange={(e) => {
-            const automation_type = e.target.value as ActivityFormInput["automation_type"];
-            if (automation_type === "none") {
-              onChange({ automation_type });
-            } else if (automation_type === "screen_time") {
-              onChange({
-                automation_type,
-                period: "daily",
-                completion_type: "count",
-                unit_label: "min",
-                target_value: null,
-                screentime_platform: null,
-              });
-            } else {
-              onChange({ automation_type, period: "daily", completion_type: "boolean" });
-            }
-          }}
-        >
-          <option value="none">None &mdash; log it myself</option>
-          <option value="leetcode_potd">LeetCode Daily Challenge</option>
-          <option value="gfg_potd">GFG Problem of the Day</option>
-          <option value="screen_time">Smartphone Screen Time</option>
-        </select>
-      </div>
+      {!hideAutomationPicker && (
+        <div>
+          <label className="field-label">Automation</label>
+          <select
+            className="field-input"
+            value={value.automation_type}
+            onChange={(e) => {
+              const automation_type = e.target.value as ActivityFormInput["automation_type"];
+              onChange(automationDefaults(automation_type));
+            }}
+          >
+            <option value="none">None &mdash; log it myself</option>
+            <option value="leetcode_potd">LeetCode Daily Challenge</option>
+            <option value="gfg_potd">GFG Problem of the Day</option>
+            <option value="screen_time">Smartphone Screen Time</option>
+          </select>
+        </div>
+      )}
 
       {isLeetcode && (
         <div>

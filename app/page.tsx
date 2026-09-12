@@ -5,7 +5,7 @@ import { ActivityRow } from "@/components/activity-row";
 import { AddActivityDialog } from "@/components/add-activity-dialog";
 import { EmptyState } from "@/components/empty-state";
 import type { Activity, Completion } from "@/lib/types";
-import { deadlineFor, formatDayLabel, isDueOn, msUntilDeadline, todayKey } from "@/lib/utils";
+import { deadlineFor, formatDayLabel, isDueOn, kolkataToday, msUntilDeadline, todayKey } from "@/lib/utils";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -22,9 +22,10 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: true });
 
   const all = (activities ?? []) as Activity[];
-  const today = new Date();
+  const now = new Date();
+  const today = kolkataToday(now);
   const dueToday = all.filter((a) => isDueOn(a, today));
-  const key = todayKey();
+  const key = todayKey(now);
 
   let completions: Completion[] = [];
   if (dueToday.length > 0) {
@@ -44,7 +45,7 @@ export default async function DashboardPage() {
 
   const uncompletedToday = dueToday
     .filter((a) => !completionByActivity.get(a.id)?.completed)
-    .sort((a, b) => (msUntilDeadline(a, today) ?? Infinity) - (msUntilDeadline(b, today) ?? Infinity));
+    .sort((a, b) => (msUntilDeadline(a, now) ?? Infinity) - (msUntilDeadline(b, now) ?? Infinity));
   const completedToday = dueToday.filter((a) => completionByActivity.get(a.id)?.completed);
 
   return (
@@ -64,16 +65,27 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        <div className="mb-8 flex items-end justify-between">
-          <div>
-            <p className="text-sm text-ink-soft">{formatDayLabel(today)}</p>
-            <h1 className="font-display text-3xl italic text-ink mt-1">
-              {dueToday.length === 0
-                ? "Nothing on the log today"
-                : `${doneCount} of ${dueToday.length} done`}
-            </h1>
+        <div className="mb-8">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-sm text-ink-soft">{formatDayLabel(today)}</p>
+              <h1 className="font-display text-3xl italic text-ink mt-1">
+                {dueToday.length === 0
+                  ? "Nothing on the log today"
+                  : `${doneCount} of ${dueToday.length} done`}
+              </h1>
+            </div>
+            <AddActivityDialog />
           </div>
-          <AddActivityDialog />
+
+          {dueToday.length > 0 && (
+            <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-line">
+              <div
+                className="h-full rounded-full bg-moss transition-[width] duration-500 ease-out"
+                style={{ width: `${Math.round((doneCount / dueToday.length) * 100)}%` }}
+              />
+            </div>
+          )}
         </div>
 
         {all.length === 0 ? (
@@ -96,16 +108,19 @@ export default async function DashboardPage() {
                   activity={activity}
                   completion={completionByActivity.get(activity.id) ?? null}
                   periodKey={key}
-                  deadline={deadlineFor(activity, today)?.toISOString() ?? null}
+                  deadline={deadlineFor(activity, now)?.toISOString() ?? null}
                 />
               ))}
             </ul>
 
             {completedToday.length > 0 && (
-              <div className="mt-8">
-                <h2 className="mb-2 text-xs uppercase tracking-wide text-ink-soft">
-                  Completed &middot; {completedToday.length}
-                </h2>
+              <div className="mt-10">
+                <div className="mb-1 flex items-center gap-3">
+                  <h2 className="shrink-0 text-xs text-ink-soft">
+                    Completed ({completedToday.length})
+                  </h2>
+                  <div className="h-px flex-1 bg-line" />
+                </div>
                 <ul>
                   {completedToday.map((activity) => (
                     <ActivityRow

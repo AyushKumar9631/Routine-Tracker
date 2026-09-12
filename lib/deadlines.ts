@@ -14,7 +14,7 @@ interface KolkataDateParts {
 }
 
 /** Today's Y/M/D as seen on an Asia/Kolkata wall clock, for a given instant. */
-function getKolkataDateParts(now: Date): KolkataDateParts {
+export function getKolkataDateParts(now: Date): KolkataDateParts {
   const shifted = new Date(now.getTime() + KOLKATA_OFFSET_MINUTES * 60000);
   return {
     year: shifted.getUTCFullYear(),
@@ -24,7 +24,7 @@ function getKolkataDateParts(now: Date): KolkataDateParts {
 }
 
 /** UTC instant corresponding to a given Asia/Kolkata wall-clock date + time. */
-function kolkataWallClockToUtc(
+export function kolkataWallClockToUtc(
   parts: KolkataDateParts,
   hour: number,
   minute: number,

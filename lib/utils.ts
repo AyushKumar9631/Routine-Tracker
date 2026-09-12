@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
-import type { Activity, Completion } from "@/lib/types";
+import type { Activity, ActivityFormInput, Completion } from "@/lib/types";
 import { DAY_NAMES } from "@/lib/types";
+import { todaysDateKey, getKolkataDateParts, kolkataWallClockToUtc } from "@/lib/deadlines";
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
@@ -19,8 +20,17 @@ export function parseDateKey(key: string): Date {
   return new Date(y, m - 1, d);
 }
 
-export function todayKey(): string {
-  return formatDateKey(new Date());
+export function todayKey(now: Date = new Date()): string {
+  return todaysDateKey(now);
+}
+
+/**
+ * Today's Asia/Kolkata calendar date, as a Date safe to read with local
+ * getters (getDay, getDate, getMonth, getFullYear) — this stays correct
+ * regardless of the server process's own timezone, unlike `new Date()`.
+ */
+export function kolkataToday(now: Date = new Date()): Date {
+  return parseDateKey(todaysDateKey(now));
 }
 
 function startOfWeek(date: Date): Date {
@@ -63,7 +73,7 @@ export function isDueOn(activity: Activity, date: Date): boolean {
 }
 
 /** Next upcoming due date (today counts if due), searching up to a year out. */
-export function nextDueDate(activity: Activity, from: Date = new Date()): Date | null {
+export function nextDueDate(activity: Activity, from: Date = kolkataToday()): Date | null {
   const cursor = new Date(from);
   cursor.setHours(0, 0, 0, 0);
   for (let i = 0; i < 366; i++) {
@@ -75,15 +85,14 @@ export function nextDueDate(activity: Activity, from: Date = new Date()): Date |
 
 /**
  * The deadline for the period-instance of `activity` due on `from`'s
- * calendar date: midnight at the end of that day, local time. Applies to
- * any period (not just daily) — whatever's due today is due by tonight.
- * Returns null if the activity isn't due on that date at all.
+ * Asia/Kolkata calendar date: midnight at the end of that day, Kolkata
+ * wall-clock time. Applies to any period (not just daily) — whatever's due
+ * today is due by tonight. Returns null if the activity isn't due at all.
  */
 export function deadlineFor(activity: Activity, from: Date = new Date()): Date | null {
-  if (!isDueOn(activity, from)) return null;
-  const midnight = new Date(from);
-  midnight.setHours(24, 0, 0, 0); // rolls over to the start of tomorrow
-  return midnight;
+  const parts = getKolkataDateParts(from);
+  if (!isDueOn(activity, new Date(parts.year, parts.month, parts.day))) return null;
+  return kolkataWallClockToUtc({ ...parts, day: parts.day + 1 }, 0, 0, 0);
 }
 
 /** Milliseconds remaining until `deadlineFor(activity, from)`; null if not due on that date. */
@@ -112,9 +121,8 @@ export function calcStreak(activity: Activity, completions: Completion[]): numbe
   const completedKeys = new Set(
     completions.filter((c) => c.completed).map((c) => c.period_key)
   );
-  const today = todayKey();
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
+  const cursor = kolkataToday();
+  const today = formatDateKey(cursor);
 
   let streak = 0;
   for (let i = 0; i < 3650; i++) {
@@ -141,8 +149,7 @@ export function calcCompletionRate(
   const completedKeys = new Set(
     completions.filter((c) => c.completed).map((c) => c.period_key)
   );
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
+  const cursor = kolkataToday();
   cursor.setDate(cursor.getDate() - (days - 1));
 
   let due = 0;
@@ -181,6 +188,24 @@ export function defaultActivityForm(): import("@/lib/types").ActivityFormInput {
     gfg_username: "",
     screentime_platform: null,
   };
+}
+
+/** Field defaults that go with a given automation type/template — shared by the template picker and the automation dropdown so they can't drift apart. */
+export function automationDefaults(
+  automation_type: ActivityFormInput["automation_type"]
+): Partial<ActivityFormInput> {
+  if (automation_type === "none") return { automation_type };
+  if (automation_type === "screen_time") {
+    return {
+      automation_type,
+      period: "daily",
+      completion_type: "count",
+      unit_label: "min",
+      target_value: null,
+      screentime_platform: null,
+    };
+  }
+  return { automation_type, period: "daily", completion_type: "boolean" };
 }
 
 /** Coarse "3h ago" / "2d ago" style label for sync timestamps. */

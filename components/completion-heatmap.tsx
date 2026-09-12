@@ -1,5 +1,5 @@
 import type { Activity, Completion } from "@/lib/types";
-import { formatDateKey, isDueOn, todayKey } from "@/lib/utils";
+import { formatDateKey, isDueOn, kolkataToday, todayKey } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 const WEEKS = 18;
@@ -14,8 +14,7 @@ export function CompletionHeatmap({
   const completedKeys = new Set(completions.filter((c) => c.completed).map((c) => c.period_key));
   const today = todayKey();
 
-  const end = new Date();
-  end.setHours(0, 0, 0, 0);
+  const end = kolkataToday();
   end.setDate(end.getDate() + (6 - end.getDay())); // extend to end of this week (Saturday)
   const start = new Date(end);
   start.setDate(start.getDate() - WEEKS * 7 + 1);
@@ -32,8 +31,8 @@ export function CompletionHeatmap({
   }
 
   function cellClass(date: Date) {
-    if (date > new Date()) return "bg-transparent";
     const key = formatDateKey(date);
+    if (key > today) return "bg-transparent";
     const due = isDueOn(activity, date);
     if (!due) return "bg-line/30";
     if (completedKeys.has(key)) return "bg-moss";
