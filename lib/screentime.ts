@@ -57,11 +57,43 @@ export function formatScreenTime(minutes: number | null | undefined): string {
   return `${hours}:${String(mins).padStart(2, "0")}`;
 }
 
+/** "13hr 15 mins" for a minutes count. "--" when there's no value yet. */
+export function formatScreenTimeLong(minutes: number | null | undefined): string {
+  if (minutes == null || !Number.isFinite(minutes)) return "--";
+  const total = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  if (hours === 0) return `${mins} mins`;
+  if (mins === 0) return `${hours}hr`;
+  return `${hours}hr ${mins} mins`;
+}
+
 export interface ScreenTimeStats {
   todayMinutes: number | null;
   weeklyAverageMinutes: number | null;
-  overallAverageMinutes: number | null;
+  monthlyAverageMinutes: number | null;
   weekLowestMinutes: number | null;
+}
+
+function valuesWithinLastDays(
+  completions: { period_key: string; value: number | null }[],
+  todayDateKey: string,
+  days: number
+): number[] {
+  const keys = new Set<string>();
+  const cursor = parseDateKey(todayDateKey);
+  for (let i = 0; i < days; i++) {
+    keys.add(formatDateKey(cursor));
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return completions
+    .filter((c) => keys.has(c.period_key))
+    .map((c) => c.value)
+    .filter((v): v is number => v != null);
+}
+
+function average(values: number[]): number | null {
+  return values.length > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null;
 }
 
 /** Rolls a screen-time activity's completion history into the numbers the "Today" gauge card shows. */
@@ -69,31 +101,17 @@ export function computeScreenTimeStats(
   completions: { period_key: string; value: number | null }[],
   todayDateKey: string
 ): ScreenTimeStats {
-  const todayMinutes =
-    completions.find((c) => c.period_key === todayDateKey)?.value ?? null;
+  const todayMinutes = completions.find((c) => c.period_key === todayDateKey)?.value ?? null;
 
-  const allValues = completions.map((c) => c.value).filter((v): v is number => v != null);
-  const overallAverageMinutes =
-    allValues.length > 0 ? Math.round(allValues.reduce((a, b) => a + b, 0) / allValues.length) : null;
+  const last7Values = valuesWithinLastDays(completions, todayDateKey, 7);
+  const last30Values = valuesWithinLastDays(completions, todayDateKey, 30);
 
-  const last7Keys = new Set<string>();
-  const cursor = parseDateKey(todayDateKey);
-  for (let i = 0; i < 7; i++) {
-    last7Keys.add(formatDateKey(cursor));
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  const last7Values = completions
-    .filter((c) => last7Keys.has(c.period_key))
-    .map((c) => c.value)
-    .filter((v): v is number => v != null);
-
-  const weeklyAverageMinutes =
-    last7Values.length > 0
-      ? Math.round(last7Values.reduce((a, b) => a + b, 0) / last7Values.length)
-      : null;
-  const weekLowestMinutes = last7Values.length > 0 ? Math.min(...last7Values) : null;
-
-  return { todayMinutes, weeklyAverageMinutes, overallAverageMinutes, weekLowestMinutes };
+  return {
+    todayMinutes,
+    weeklyAverageMinutes: average(last7Values),
+    monthlyAverageMinutes: average(last30Values),
+    weekLowestMinutes: last7Values.length > 0 ? Math.min(...last7Values) : null,
+  };
 }
 
 export type ScreenTimeLevel = "moss" | "amber" | "rust";
@@ -110,10 +128,15 @@ export function screenTimeLevel(minutes: number, limitMinutes: number | null): S
 // The gauge's arc represents 0 -> 150% of the limit; beyond that it just stays fully filled.
 // With no limit set, fall back to a fixed 4-hour reference scale so the gauge still reads sensibly.
 const NO_LIMIT_REFERENCE_MINUTES = 240;
-const GAUGE_OVERSHOOT = 1.5;
+export const GAUGE_OVERSHOOT = 1.5;
 
 /** 0-1 fraction of the gauge arc to fill for a given screen-time total. */
 export function screenTimeFillFraction(minutes: number, limitMinutes: number | null): number {
   const scale = limitMinutes && limitMinutes > 0 ? limitMinutes * GAUGE_OVERSHOOT : NO_LIMIT_REFERENCE_MINUTES;
   return Math.max(0, Math.min(minutes / scale, 1));
+}
+
+/** 0-1 position along the gauge arc where the daily limit itself sits (always 1/GAUGE_OVERSHOOT of the way across). */
+export function screenTimeLimitMarkFraction(): number {
+  return 1 / GAUGE_OVERSHOOT;
 }

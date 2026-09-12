@@ -1,4 +1,9 @@
-import { formatScreenTime, screenTimeFillFraction, screenTimeLevel } from "@/lib/screentime";
+import {
+  formatScreenTime,
+  screenTimeFillFraction,
+  screenTimeLevel,
+  screenTimeLimitMarkFraction,
+} from "@/lib/screentime";
 
 const STROKE_CLASS = {
   moss: "stroke-moss",
@@ -19,14 +24,14 @@ const STROKE_WIDTH = 13;
 const START_ANGLE = 135;
 const SWEEP = 270;
 
-function polar(angleDeg: number) {
+function point(angleDeg: number, radius: number) {
   const rad = (angleDeg * Math.PI) / 180;
-  return { x: CX + R * Math.cos(rad), y: CY + R * Math.sin(rad) };
+  return { x: CX + radius * Math.cos(rad), y: CY + radius * Math.sin(rad) };
 }
 
 function arcPath(startAngle: number, endAngle: number) {
-  const start = polar(startAngle);
-  const end = polar(endAngle);
+  const start = point(startAngle, R);
+  const end = point(endAngle, R);
   const largeArc = endAngle - startAngle > 180 ? 1 : 0;
   return `M ${start.x} ${start.y} A ${R} ${R} 0 ${largeArc} 1 ${end.x} ${end.y}`;
 }
@@ -41,7 +46,14 @@ export function ScreenTimeGauge({
   const level = screenTimeLevel(minutes, limitMinutes);
   const fraction = screenTimeFillFraction(minutes, limitMinutes);
   const fillEndAngle = START_ANGLE + fraction * SWEEP;
-  const origin = polar(START_ANGLE);
+  const origin = point(START_ANGLE, R);
+
+  // The limit itself always sits at the same spot along the arc (a fixed
+  // fraction of the 0 -> 150%-of-limit sweep) — a cut mark there shows
+  // whether today's fill has crossed the boundary, without a raw number.
+  const limitAngle = START_ANGLE + screenTimeLimitMarkFraction() * SWEEP;
+  const limitInner = point(limitAngle, R - STROKE_WIDTH / 2 - 4);
+  const limitOuter = point(limitAngle, R + STROKE_WIDTH / 2 + 4);
 
   return (
     <svg viewBox="0 0 200 170" className="mx-auto w-full max-w-[190px]" aria-hidden="true">
@@ -65,6 +77,18 @@ export function ScreenTimeGauge({
           />
           <circle cx={origin.x} cy={origin.y} r={STROKE_WIDTH / 2} className={FILL_CLASS[level]} />
         </>
+      )}
+
+      {limitMinutes != null && limitMinutes > 0 && (
+        <line
+          x1={limitInner.x}
+          y1={limitInner.y}
+          x2={limitOuter.x}
+          y2={limitOuter.y}
+          strokeWidth={3}
+          strokeLinecap="round"
+          className="stroke-ink"
+        />
       )}
 
       <text

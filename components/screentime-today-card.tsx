@@ -1,7 +1,8 @@
 import { ActivityIcon } from "@/components/activity-icon";
 import { ScreenTimeGauge } from "@/components/screentime-gauge";
-import { formatScreenTime, type ScreenTimeStats } from "@/lib/screentime";
+import { formatScreenTimeLong, type ScreenTimeStats } from "@/lib/screentime";
 import type { Activity } from "@/lib/types";
+import { formatRelativeTime } from "@/lib/utils";
 
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
@@ -15,9 +16,11 @@ function StatRow({ label, value }: { label: string; value: string }) {
 export function ScreenTimeTodayCard({
   activity,
   stats,
+  lastSyncedAt,
 }: {
   activity: Activity;
   stats: ScreenTimeStats;
+  lastSyncedAt: string | null;
 }) {
   return (
     <div className="mb-6 rounded border border-line bg-card p-5">
@@ -26,11 +29,7 @@ export function ScreenTimeTodayCard({
           <ActivityIcon icon={activity.icon} className="text-base" />
           <span className="text-sm text-ink-soft">{activity.name}</span>
         </div>
-        {activity.target_value != null && (
-          <span className="text-xs text-ink-soft">
-            limit {formatScreenTime(activity.target_value)}
-          </span>
-        )}
+        <span className="text-xs text-ink-soft">Last synced {formatRelativeTime(lastSyncedAt)}</span>
       </div>
 
       <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
@@ -39,9 +38,9 @@ export function ScreenTimeTodayCard({
         </div>
 
         <div className="w-full divide-y divide-line sm:pl-6">
-          <StatRow label="Weekly average" value={formatScreenTime(stats.weeklyAverageMinutes)} />
-          <StatRow label="Overall average" value={formatScreenTime(stats.overallAverageMinutes)} />
-          <StatRow label="Week lowest" value={formatScreenTime(stats.weekLowestMinutes)} />
+          <StatRow label="Weekly average" value={formatScreenTimeLong(stats.weeklyAverageMinutes)} />
+          <StatRow label="Monthly average" value={formatScreenTimeLong(stats.monthlyAverageMinutes)} />
+          <StatRow label="Week lowest" value={formatScreenTimeLong(stats.weekLowestMinutes)} />
         </div>
       </div>
     </div>

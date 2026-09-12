@@ -192,6 +192,8 @@ export function defaultActivityForm(): import("@/lib/types").ActivityFormInput {
 
 export const LEETCODE_ICON_URL = "https://assets.leetcode.com/users/leetcode/avatar_1568224780.png";
 export const GFG_ICON_URL = "https://media.geeksforgeeks.org/gfg-gg-logo.svg";
+export const SCREENTIME_ICON_URL =
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRMtNVoeSIdwiFzmD-p3UE6KlmEiorOs8jPV2vkewqmEA&s=10";
 
 /** Whether an activity's icon field holds an image URL rather than an emoji/text glyph. */
 export function isImageIcon(icon: string | null | undefined): boolean {
@@ -218,6 +220,7 @@ export function automationDefaults(
       unit_label: "min",
       target_value: null,
       screentime_platform: null,
+      icon: SCREENTIME_ICON_URL,
     };
   }
   return { automation_type, period: "daily", completion_type: "boolean" };

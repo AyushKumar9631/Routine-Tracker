@@ -48,6 +48,7 @@ export default async function DashboardPage() {
   }
 
   let screenTimeStats = null;
+  let screenTimeLastSyncedAt: string | null = null;
   if (screenTimeActivity) {
     const { data } = await supabase
       .from("completions")
@@ -59,6 +60,13 @@ export default async function DashboardPage() {
       (data ?? []) as { period_key: string; value: number | null }[],
       key
     );
+
+    const { data: config } = await supabase
+      .from("screentime_config")
+      .select("last_synced_at")
+      .eq("activity_id", screenTimeActivity.id)
+      .maybeSingle();
+    screenTimeLastSyncedAt = config?.last_synced_at ?? null;
   }
 
   const completionByActivity = new Map(completions.map((c) => [c.activity_id, c]));
@@ -92,7 +100,11 @@ export default async function DashboardPage() {
         </div>
 
         {screenTimeActivity && screenTimeStats && (
-          <ScreenTimeTodayCard activity={screenTimeActivity} stats={screenTimeStats} />
+          <ScreenTimeTodayCard
+            activity={screenTimeActivity}
+            stats={screenTimeStats}
+            lastSyncedAt={screenTimeLastSyncedAt}
+          />
         )}
 
         <div className="mb-8">
