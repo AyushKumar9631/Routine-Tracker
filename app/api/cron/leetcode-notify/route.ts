@@ -67,6 +67,24 @@ export async function GET(request: Request) {
     (todaysCompletions ?? []).filter((c) => c.completed).map((c) => c.activity_id)
   );
 
+  // Per-user topic, not a single shared NTFY_TOPIC_URL — each user connects
+  // their own from the nav bar (see actions/notifications.ts).
+  const userIds = [...new Set(activeActivities.map((a) => a.user_id))];
+  const { data: notificationSettings, error: notificationSettingsError } = await supabase
+    .from("notification_settings")
+    .select("user_id, ntfy_topic")
+    .in("user_id", userIds);
+
+  if (notificationSettingsError) {
+    return NextResponse.json({ error: notificationSettingsError.message }, { status: 500 });
+  }
+
+  const topicByUser = new Map(
+    (notificationSettings ?? [])
+      .filter((s) => s.ntfy_topic)
+      .map((s) => [s.user_id, s.ntfy_topic as string])
+  );
+
   const results = await Promise.all(
     (configs ?? []).map(async (cfg) => {
       const activityId = cfg.activity_id as string;
@@ -106,7 +124,16 @@ export async function GET(request: Request) {
           return { activity_id: activityId, solved: true };
         }
 
+        // Still unsolved past the threshold. Notify only if this user has
+        // connected a topic — otherwise there's nowhere to send it, so skip
+        // without touching last_notified_on (nothing was actually sent).
+        const topic = topicByUser.get(userId);
+        if (!topic) {
+          return { activity_id: activityId, skipped: "no notification channel connected" };
+        }
+
         const sent = await sendNotification(
+          topic,
           "LeetCode POTD deadline approaching",
           `"${result.title}" is still unsolved — deadline is midnight tonight.`
         );

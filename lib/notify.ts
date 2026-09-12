@@ -2,21 +2,30 @@
 // changes if the channel is ever swapped (Pushover, Telegram, etc.) — every
 // caller just gets a boolean back and doesn't know or care how the push
 // actually happened.
+//
+// Per-user: each user connects their own topic (see actions/notifications.ts
+// and notification_settings), so this takes the topic as an argument rather
+// than reading a single shared env var.
+
+const NTFY_BASE_URL = "https://ntfy.sh";
 
 /**
- * Sends a push notification via ntfy.sh (topic URL from NTFY_TOPIC_URL).
- * Returns whether the send actually succeeded — checks the response status,
- * not just whether the request threw.
+ * Sends a push notification to a given ntfy.sh topic. Returns whether the
+ * send actually succeeded — checks the response status, not just whether
+ * the request threw.
  */
-export async function sendNotification(title: string, body: string): Promise<boolean> {
-  const topicUrl = process.env.NTFY_TOPIC_URL;
-  if (!topicUrl) {
-    console.error("sendNotification: NTFY_TOPIC_URL is not set");
+export async function sendNotification(
+  topic: string,
+  title: string,
+  body: string
+): Promise<boolean> {
+  if (!topic) {
+    console.error("sendNotification: no topic provided");
     return false;
   }
 
   try {
-    const res = await fetch(topicUrl, {
+    const res = await fetch(`${NTFY_BASE_URL}/${encodeURIComponent(topic)}`, {
       method: "POST",
       headers: { Title: title },
       body,

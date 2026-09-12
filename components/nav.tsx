@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/actions/auth";
+import { NotificationSettingsButton } from "@/components/notification-settings-button";
 
 const links = [
   { href: "/", label: "Today" },
@@ -38,6 +39,8 @@ export function Nav() {
               </Link>
             );
           })}
+
+          <NotificationSettingsButton />
 
           <form action={signOut}>
             <button
