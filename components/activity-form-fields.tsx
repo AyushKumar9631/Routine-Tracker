@@ -3,6 +3,7 @@
 import type { ActivityFormInput, CompletionType, Period } from "@/lib/types";
 import { DAY_NAMES } from "@/lib/types";
 import { ScreentimeSetupPanel } from "@/components/screentime-setup-panel";
+import { ActivityIcon } from "@/components/activity-icon";
 import { DEFAULT_NOTIFICATION_TEMPLATE, DEFAULT_GFG_NOTIFICATION_TEMPLATE } from "@/lib/notification-template";
 import { automationDefaults } from "@/lib/utils";
 
@@ -24,14 +25,19 @@ export function ActivityFormFields({
   return (
     <div className="space-y-4">
       <div className="flex gap-3">
-        <div className="w-16">
+        <div className="w-40">
           <label className="field-label">Icon</label>
-          <input
-            className="field-input text-center"
-            value={value.icon}
-            maxLength={2}
-            onChange={(e) => onChange({ icon: e.target.value })}
-          />
+          <div className="flex items-center gap-2">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-line bg-paper text-lg">
+              <ActivityIcon icon={value.icon} />
+            </span>
+            <input
+              className="field-input"
+              placeholder="\u2713 or image URL"
+              value={value.icon}
+              onChange={(e) => onChange({ icon: e.target.value })}
+            />
+          </div>
         </div>
         <div className="flex-1">
           <label className="field-label">Name</label>

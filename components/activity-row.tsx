@@ -6,6 +6,7 @@ import { logCompletion } from "@/actions/completions";
 import { LeetcodeSyncButton } from "@/components/leetcode-sync-button";
 import { GfgSyncButton } from "@/components/gfg-sync-button";
 import { DeadlineBadge, useDeadlineCountdown, type Urgency } from "@/components/deadline-countdown";
+import { ActivityIcon } from "@/components/activity-icon";
 import type { Activity, Completion } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -84,7 +85,7 @@ export function ActivityRow({
             isDone ? "text-ink-soft line-through decoration-ink-soft/50" : "text-ink"
           )}
         >
-          <span className="mr-1">{activity.icon}</span>
+          <ActivityIcon icon={activity.icon} className="mr-1" />
           {activity.name}
         </Link>
         {activity.description && (

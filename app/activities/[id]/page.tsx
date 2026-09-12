@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Nav } from "@/components/nav";
 import { EditActivityDialog } from "@/components/edit-activity-dialog";
+import { ActivityIcon } from "@/components/activity-icon";
 import { LeetcodeSyncButton } from "@/components/leetcode-sync-button";
 import { GfgSyncButton } from "@/components/gfg-sync-button";
 import { ScreentimeWebhookCard } from "@/components/screentime-webhook-card";
@@ -85,7 +86,7 @@ export default async function ActivityDetailPage({
         <div className="mb-8 mt-3 flex items-start justify-between">
           <div>
             <h1 className="font-display text-3xl italic text-ink">
-              <span className="mr-2">{typedActivity.icon}</span>
+              <ActivityIcon icon={typedActivity.icon} className="mr-2" />
               {typedActivity.name}
             </h1>
             <p className="mt-1 text-sm text-ink-soft">{scheduleLabel(typedActivity)}</p>

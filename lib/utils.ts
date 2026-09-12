@@ -190,11 +190,26 @@ export function defaultActivityForm(): import("@/lib/types").ActivityFormInput {
   };
 }
 
+export const LEETCODE_ICON_URL = "https://assets.leetcode.com/users/leetcode/avatar_1568224780.png";
+export const GFG_ICON_URL = "https://media.geeksforgeeks.org/gfg-gg-logo.svg";
+
+/** Whether an activity's icon field holds an image URL rather than an emoji/text glyph. */
+export function isImageIcon(icon: string | null | undefined): boolean {
+  if (!icon) return false;
+  return /^(https?:|data:image\/)/i.test(icon.trim());
+}
+
 /** Field defaults that go with a given automation type/template — shared by the template picker and the automation dropdown so they can't drift apart. */
 export function automationDefaults(
   automation_type: ActivityFormInput["automation_type"]
 ): Partial<ActivityFormInput> {
   if (automation_type === "none") return { automation_type };
+  if (automation_type === "leetcode_potd") {
+    return { automation_type, period: "daily", completion_type: "boolean", icon: LEETCODE_ICON_URL };
+  }
+  if (automation_type === "gfg_potd") {
+    return { automation_type, period: "daily", completion_type: "boolean", icon: GFG_ICON_URL };
+  }
   if (automation_type === "screen_time") {
     return {
       automation_type,

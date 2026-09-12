@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTransition } from "react";
 import { toggleActivityActive } from "@/actions/activities";
 import { EditActivityDialog } from "@/components/edit-activity-dialog";
+import { ActivityIcon } from "@/components/activity-icon";
 import type { Activity } from "@/lib/types";
 import { cn, scheduleLabel } from "@/lib/utils";
 
@@ -23,7 +24,7 @@ export function ActivityListItem({ activity }: { activity: Activity }) {
         !activity.is_active && "opacity-50"
       )}
     >
-      <span className="text-lg">{activity.icon}</span>
+      <ActivityIcon icon={activity.icon} className="text-lg" />
 
       <div className="min-w-0 flex-1">
         <Link
