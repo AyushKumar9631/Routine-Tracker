@@ -4,7 +4,11 @@ import type { ActivityFormInput, CompletionType, Period } from "@/lib/types";
 import { DAY_NAMES } from "@/lib/types";
 import { ScreentimeSetupPanel } from "@/components/screentime-setup-panel";
 import { ActivityIcon } from "@/components/activity-icon";
-import { DEFAULT_NOTIFICATION_TEMPLATE, DEFAULT_GFG_NOTIFICATION_TEMPLATE } from "@/lib/notification-template";
+import {
+  DEFAULT_NOTIFICATION_TEMPLATE,
+  DEFAULT_GFG_NOTIFICATION_TEMPLATE,
+  DEFAULT_SCREENTIME_NOTIFICATION_TEMPLATES,
+} from "@/lib/notification-template";
 import { automationDefaults } from "@/lib/utils";
 
 export function ActivityFormFields({
@@ -237,6 +241,53 @@ export function ActivityFormFields({
               Colors today&apos;s gauge &mdash; green under 80% of this, amber up to 110%, red
               beyond. Every synced day still logs as done regardless of budget.
             </p>
+          </div>
+
+          <div className="mt-3 space-y-3">
+            <p className="field-label mb-0">Budget notifications (optional)</p>
+            <p className="text-xs text-ink-soft">
+              Sent at most once a day each, the moment a synced total crosses the threshold.
+              Requires a daily budget above. Variables:{" "}
+              <code className="rounded bg-paper px-1 py-0.5">{"{minutes}"}</code>,{" "}
+              <code className="rounded bg-paper px-1 py-0.5">{"{limit}"}</code>,{" "}
+              <code className="rounded bg-paper px-1 py-0.5">{"{percent}"}</code>.
+            </p>
+
+            <div>
+              <label className="field-label">At 90%</label>
+              <textarea
+                className="field-input min-h-[48px] resize-y"
+                placeholder={DEFAULT_SCREENTIME_NOTIFICATION_TEMPLATES[90]}
+                value={value.screentime_notify_90_template ?? ""}
+                onChange={(e) =>
+                  onChange({ screentime_notify_90_template: e.target.value === "" ? null : e.target.value })
+                }
+              />
+            </div>
+
+            <div>
+              <label className="field-label">At 110%</label>
+              <textarea
+                className="field-input min-h-[48px] resize-y"
+                placeholder={DEFAULT_SCREENTIME_NOTIFICATION_TEMPLATES[110]}
+                value={value.screentime_notify_110_template ?? ""}
+                onChange={(e) =>
+                  onChange({ screentime_notify_110_template: e.target.value === "" ? null : e.target.value })
+                }
+              />
+            </div>
+
+            <div>
+              <label className="field-label">At 150%</label>
+              <textarea
+                className="field-input min-h-[48px] resize-y"
+                placeholder={DEFAULT_SCREENTIME_NOTIFICATION_TEMPLATES[150]}
+                value={value.screentime_notify_150_template ?? ""}
+                onChange={(e) =>
+                  onChange({ screentime_notify_150_template: e.target.value === "" ? null : e.target.value })
+                }
+              />
+            </div>
           </div>
         </div>
       )}

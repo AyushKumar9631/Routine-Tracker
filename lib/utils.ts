@@ -187,6 +187,9 @@ export function defaultActivityForm(): import("@/lib/types").ActivityFormInput {
     notification_template: null,
     gfg_username: "",
     screentime_platform: null,
+    screentime_notify_90_template: null,
+    screentime_notify_110_template: null,
+    screentime_notify_150_template: null,
   };
 }
 
@@ -220,6 +223,9 @@ export function automationDefaults(
       unit_label: "min",
       target_value: null,
       screentime_platform: null,
+      screentime_notify_90_template: null,
+      screentime_notify_110_template: null,
+      screentime_notify_150_template: null,
       icon: SCREENTIME_ICON_URL,
     };
   }

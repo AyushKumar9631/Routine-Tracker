@@ -22,6 +22,23 @@ export interface GfgNotificationTemplateVars {
   streak: string; // current streak count observed at check time
 }
 
+// Screen time has no deadline-check job — the three thresholds below fire
+// straight out of the ingest webhook (see lib/screentime.ts +
+// app/api/screentime/[token]/route.ts), each at most once per day.
+export type ScreenTimeNotifyThreshold = 90 | 110 | 150;
+
+export interface ScreenTimeNotificationTemplateVars {
+  minutes: string; // total minutes logged today
+  limit: string; // the activity's daily budget, in minutes
+  percent: string; // rounded % of budget used
+}
+
+export const DEFAULT_SCREENTIME_NOTIFICATION_TEMPLATES: Record<ScreenTimeNotifyThreshold, string> = {
+  90: "Screen time is at {percent}% of today's {limit}-min budget ({minutes} min so far).",
+  110: "Screen time budget exceeded \u2014 {percent}% used ({minutes}/{limit} min).",
+  150: "Screen time is way past budget: {percent}% used ({minutes}/{limit} min). Time to put the phone down.",
+};
+
 /**
  * Fills in `{key}` placeholders in a user-supplied template from a vars
  * object. Unrecognized placeholders are left as-is rather than stripped, so

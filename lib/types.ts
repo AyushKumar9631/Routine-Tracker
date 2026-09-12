@@ -63,6 +63,12 @@ export interface ScreentimeConfig {
   platform: "ios" | "android";
   token: string;
   last_synced_at: string | null;
+  notify_90_template: string | null; // custom message; null = use the default
+  notify_110_template: string | null;
+  notify_150_template: string | null;
+  last_notified_90_on: string | null; // date, set once that threshold's notification has sent today
+  last_notified_110_on: string | null;
+  last_notified_150_on: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -98,6 +104,9 @@ export interface ActivityFormInput {
   notification_template: string | null; // LeetCode + GFG; null = use the default
   gfg_username: string;
   screentime_platform: "ios" | "android" | null;
+  screentime_notify_90_template: string | null; // null = use the default
+  screentime_notify_110_template: string | null;
+  screentime_notify_150_template: string | null;
 }
 
 export const DAY_NAMES = [

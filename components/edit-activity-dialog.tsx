@@ -15,7 +15,10 @@ function toFormInput(
   gfgUsername = "",
   screentimePlatform: "ios" | "android" | null = null,
   preferredCompleteBy: string | null = null,
-  notificationTemplate: string | null = null
+  notificationTemplate: string | null = null,
+  screentimeNotify90: string | null = null,
+  screentimeNotify110: string | null = null,
+  screentimeNotify150: string | null = null
 ): ActivityFormInput {
   const automation_type =
     activity.automation_type === "leetcode_potd" ||
@@ -41,6 +44,9 @@ function toFormInput(
     notification_template: notificationTemplate,
     gfg_username: gfgUsername,
     screentime_platform: screentimePlatform,
+    screentime_notify_90_template: screentimeNotify90,
+    screentime_notify_110_template: screentimeNotify110,
+    screentime_notify_150_template: screentimeNotify150,
   };
 }
 
@@ -81,7 +87,19 @@ export function EditActivityDialog({ activity }: { activity: Activity }) {
       );
     } else if (activity.automation_type === "screen_time") {
       getScreentimeConfig(activity.id).then((config) =>
-        setValue(toFormInput(activity, "", "", config?.platform ?? "ios"))
+        setValue(
+          toFormInput(
+            activity,
+            "",
+            "",
+            config?.platform ?? "ios",
+            null,
+            null,
+            config?.notify_90_template ?? null,
+            config?.notify_110_template ?? null,
+            config?.notify_150_template ?? null
+          )
+        )
       );
     } else {
       setValue(toFormInput(activity));

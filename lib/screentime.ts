@@ -140,3 +140,19 @@ export function screenTimeFillFraction(minutes: number, limitMinutes: number | n
 export function screenTimeLimitMarkFraction(): number {
   return 1 / GAUGE_OVERSHOOT;
 }
+
+export const SCREENTIME_NOTIFY_THRESHOLDS = [90, 110, 150] as const;
+
+/**
+ * Which of the fixed 90/110/150% budget thresholds today's total has
+ * reached so far, ascending. No budget set = no thresholds ever reached
+ * (mirrors screenTimeLevel's "no limit = always fine" behavior).
+ */
+export function reachedScreenTimeThresholds(
+  minutes: number,
+  limitMinutes: number | null
+): (typeof SCREENTIME_NOTIFY_THRESHOLDS)[number][] {
+  if (!limitMinutes || limitMinutes <= 0) return [];
+  const pct = (minutes / limitMinutes) * 100;
+  return SCREENTIME_NOTIFY_THRESHOLDS.filter((t) => pct >= t);
+}

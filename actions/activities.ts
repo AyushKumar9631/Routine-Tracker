@@ -88,6 +88,9 @@ export async function createActivity(input: ActivityFormInput) {
       user_id: user.id,
       platform: "ios",
       token,
+      notify_90_template: input.screentime_notify_90_template || null,
+      notify_110_template: input.screentime_notify_110_template || null,
+      notify_150_template: input.screentime_notify_150_template || null,
     });
     if (configError) throw new Error(configError.message);
   }
@@ -193,6 +196,11 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
       .select("id")
       .eq("activity_id", id)
       .maybeSingle();
+    const notifyTemplates = {
+      notify_90_template: input.screentime_notify_90_template || null,
+      notify_110_template: input.screentime_notify_110_template || null,
+      notify_150_template: input.screentime_notify_150_template || null,
+    };
     if (!existing) {
       const token = randomBytes(24).toString("hex");
       const { error: configError } = await supabase.from("screentime_config").insert({
@@ -200,7 +208,15 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
         user_id: user.id,
         platform: "ios",
         token,
+        ...notifyTemplates,
       });
+      if (configError) throw new Error(configError.message);
+    } else {
+      const { error: configError } = await supabase
+        .from("screentime_config")
+        .update(notifyTemplates)
+        .eq("activity_id", id)
+        .eq("user_id", user.id);
       if (configError) throw new Error(configError.message);
     }
     await supabase.from("leetcode_potd_config").delete().eq("activity_id", id);
