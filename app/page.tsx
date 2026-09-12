@@ -3,8 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { Nav } from "@/components/nav";
 import { ActivityRow } from "@/components/activity-row";
 import { AddActivityDialog } from "@/components/add-activity-dialog";
+import { ScreenTimeTodayCard } from "@/components/screentime-today-card";
 import { EmptyState } from "@/components/empty-state";
 import type { Activity, Completion } from "@/lib/types";
+import { computeScreenTimeStats } from "@/lib/screentime";
 import { deadlineFor, formatDayLabel, isDueOn, kolkataToday, msUntilDeadline, todayKey } from "@/lib/utils";
 
 export default async function DashboardPage() {
@@ -24,8 +26,13 @@ export default async function DashboardPage() {
   const all = (activities ?? []) as Activity[];
   const now = new Date();
   const today = kolkataToday(now);
-  const dueToday = all.filter((a) => isDueOn(a, today));
   const key = todayKey(now);
+
+  // Screen Time is a passive daily readout, not a task with a deadline — it
+  // gets its own gauge card up top instead of a row in the log below.
+  const screenTimeActivity = all.find((a) => a.automation_type === "screen_time") ?? null;
+  const taskActivities = all.filter((a) => a.automation_type !== "screen_time");
+  const dueToday = taskActivities.filter((a) => isDueOn(a, today));
 
   let completions: Completion[] = [];
   if (dueToday.length > 0) {
@@ -38,6 +45,20 @@ export default async function DashboardPage() {
         dueToday.map((a) => a.id)
       );
     completions = (data ?? []) as Completion[];
+  }
+
+  let screenTimeStats = null;
+  if (screenTimeActivity) {
+    const { data } = await supabase
+      .from("completions")
+      .select("period_key, value")
+      .eq("activity_id", screenTimeActivity.id)
+      .order("period_key", { ascending: false })
+      .limit(400);
+    screenTimeStats = computeScreenTimeStats(
+      (data ?? []) as { period_key: string; value: number | null }[],
+      key
+    );
   }
 
   const completionByActivity = new Map(completions.map((c) => [c.activity_id, c]));
@@ -65,18 +86,21 @@ export default async function DashboardPage() {
           </div>
         )}
 
+        <div className="mb-6 flex items-end justify-between">
+          <p className="text-sm text-ink-soft">{formatDayLabel(today)}</p>
+          <AddActivityDialog />
+        </div>
+
+        {screenTimeActivity && screenTimeStats && (
+          <ScreenTimeTodayCard activity={screenTimeActivity} stats={screenTimeStats} />
+        )}
+
         <div className="mb-8">
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-sm text-ink-soft">{formatDayLabel(today)}</p>
-              <h1 className="font-display text-3xl italic text-ink mt-1">
-                {dueToday.length === 0
-                  ? "Nothing on the log today"
-                  : `${doneCount} of ${dueToday.length} done`}
-              </h1>
-            </div>
-            <AddActivityDialog />
-          </div>
+          <h1 className="font-display text-3xl italic text-ink">
+            {dueToday.length === 0
+              ? "Nothing on the log today"
+              : `${doneCount} of ${dueToday.length} done`}
+          </h1>
 
           {dueToday.length > 0 && (
             <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-line">

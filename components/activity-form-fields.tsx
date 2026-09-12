@@ -234,8 +234,8 @@ export function ActivityFormFields({
               }
             />
             <p className="mt-1 text-xs text-ink-soft">
-              Shown for reference on the activity page &mdash; every synced day is logged as
-              done, whether or not it&apos;s under budget.
+              Colors today&apos;s gauge &mdash; green under 80% of this, amber up to 110%, red
+              beyond. Every synced day still logs as done regardless of budget.
             </p>
           </div>
         </div>
