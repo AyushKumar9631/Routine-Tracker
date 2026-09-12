@@ -1,5 +1,7 @@
 name: POTD Sync
 
+# LeetCode's sync + notify are both handled by Supabase pg_cron now (see
+# 010_leetcode_notify_sql_gate.sql) — this workflow is GFG-only.
 on:
   schedule:
     # Every 30 min. GitHub Actions cron is best-effort and can lag a bit,
@@ -9,14 +11,6 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  sync-leetcode:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger LeetCode sync endpoint
-        run: |
-          curl -sf -X GET "${{ secrets.APP_URL }}/api/cron/leetcode-potd" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
-
   sync-gfg:
     runs-on: ubuntu-latest
     steps:
