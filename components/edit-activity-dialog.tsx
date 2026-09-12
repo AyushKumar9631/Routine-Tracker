@@ -14,7 +14,8 @@ function toFormInput(
   leetcodeUsername = "",
   gfgUsername = "",
   screentimePlatform: "ios" | "android" | null = null,
-  preferredCompleteBy: string | null = null
+  preferredCompleteBy: string | null = null,
+  notificationTemplate: string | null = null
 ): ActivityFormInput {
   const automation_type =
     activity.automation_type === "leetcode_potd" ||
@@ -37,6 +38,7 @@ function toFormInput(
     automation_type,
     leetcode_username: leetcodeUsername,
     preferred_complete_by: preferredCompleteBy,
+    notification_template: notificationTemplate,
     gfg_username: gfgUsername,
     screentime_platform: screentimePlatform,
   };
@@ -54,7 +56,14 @@ export function EditActivityDialog({ activity }: { activity: Activity }) {
     if (activity.automation_type === "leetcode_potd") {
       getLeetcodeConfig(activity.id).then((config) =>
         setValue(
-          toFormInput(activity, config.leetcode_username, "", null, config.preferred_complete_by)
+          toFormInput(
+            activity,
+            config.leetcode_username,
+            "",
+            null,
+            config.preferred_complete_by,
+            config.notification_template
+          )
         )
       );
     } else if (activity.automation_type === "gfg_potd") {

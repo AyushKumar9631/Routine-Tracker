@@ -3,6 +3,7 @@
 import type { ActivityFormInput, CompletionType, Period } from "@/lib/types";
 import { DAY_NAMES } from "@/lib/types";
 import { ScreentimeSetupPanel } from "@/components/screentime-setup-panel";
+import { DEFAULT_NOTIFICATION_TEMPLATE } from "@/lib/notification-template";
 
 export function ActivityFormFields({
   value,
@@ -108,6 +109,24 @@ export function ActivityFormFields({
             <p className="mt-1 text-xs text-ink-soft">
               Get a nudge if it&apos;s still unsolved by this time. Leave blank to default to
               2 hours before the midnight deadline.
+            </p>
+          </div>
+
+          <div className="mt-3">
+            <label className="field-label">Notification message (optional)</label>
+            <textarea
+              className="field-input min-h-[64px] resize-y"
+              placeholder={DEFAULT_NOTIFICATION_TEMPLATE}
+              value={value.notification_template ?? ""}
+              onChange={(e) =>
+                onChange({ notification_template: e.target.value === "" ? null : e.target.value })
+              }
+            />
+            <p className="mt-1 text-xs text-ink-soft">
+              Leave blank to use the default above. Variables you can use:{" "}
+              <code className="rounded bg-paper px-1 py-0.5">{"{question}"}</code>,{" "}
+              <code className="rounded bg-paper px-1 py-0.5">{"{number}"}</code>,{" "}
+              <code className="rounded bg-paper px-1 py-0.5">{"{difficulty}"}</code>.
             </p>
           </div>
         </div>

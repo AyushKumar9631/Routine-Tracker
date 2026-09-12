@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncLeetcodeActivity } from "@/lib/leetcode-sync";
 import { sendNotification } from "@/lib/notify";
+import { DEFAULT_NOTIFICATION_TEMPLATE, renderNotificationTemplate } from "@/lib/notification-template";
 import { todaysDateKey, todaysNotifyThreshold } from "@/lib/deadlines";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,9 @@ export async function GET(request: Request) {
 
   const { data: configs, error: configError } = await supabase
     .from("leetcode_potd_config")
-    .select("activity_id, leetcode_username, preferred_complete_by, last_notified_on")
+    .select(
+      "activity_id, leetcode_username, preferred_complete_by, notification_template, last_notified_on"
+    )
     .in("activity_id", activityIds);
 
   if (configError) {
@@ -124,19 +127,42 @@ export async function GET(request: Request) {
           return { activity_id: activityId, solved: true };
         }
 
-        // Still unsolved past the threshold. Notify only if this user has
-        // connected a topic — otherwise there's nowhere to send it, so skip
-        // without touching last_notified_on (nothing was actually sent).
+        // Still unsolved past the threshold. Re-check last_notified_on fresh
+        // (rather than trusting the value read at the top of this request)
+        // right before sending — closes the small race window where two
+        // requests (e.g. pg_cron and a manual test hit close together)
+        // could both pass the step-3 check above and both try to send.
+        const { data: freshConfig, error: freshConfigError } = await supabase
+          .from("leetcode_potd_config")
+          .select("last_notified_on")
+          .eq("activity_id", activityId)
+          .maybeSingle();
+
+        if (freshConfigError) {
+          return { activity_id: activityId, error: freshConfigError.message };
+        }
+        if (freshConfig?.last_notified_on === todayKey) {
+          return { activity_id: activityId, skipped: "already notified today (caught on re-check)" };
+        }
+
+        // Notify only if this user has connected a topic — otherwise
+        // there's nowhere to send it, so skip without touching
+        // last_notified_on (nothing was actually sent).
         const topic = topicByUser.get(userId);
         if (!topic) {
           return { activity_id: activityId, skipped: "no notification channel connected" };
         }
 
-        const sent = await sendNotification(
-          topic,
-          "LeetCode POTD deadline approaching",
-          `"${result.title}" is still unsolved — deadline is midnight tonight.`
+        const message = renderNotificationTemplate(
+          cfg.notification_template || DEFAULT_NOTIFICATION_TEMPLATE,
+          {
+            question: result.title,
+            number: result.questionNumber,
+            difficulty: result.difficulty,
+          }
         );
+
+        const sent = await sendNotification(topic, "LeetCode POTD deadline approaching", message);
 
         if (!sent) {
           return { activity_id: activityId, notified: false, error: "notification send failed" };

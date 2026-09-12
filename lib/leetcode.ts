@@ -16,6 +16,8 @@ const QUERY = `
       question {
         titleSlug
         title
+        difficulty
+        questionFrontendId
       }
     }
     recentAcSubmissionList(username: $username, limit: 20) {
@@ -29,6 +31,8 @@ export interface LeetCodePotdResult {
   date: string; // POTD date, "YYYY-MM-DD", UTC
   titleSlug: string;
   title: string;
+  difficulty: string; // "Easy" | "Medium" | "Hard"
+  questionNumber: string; // LeetCode's "frontend id", e.g. "2434"
   solved: boolean;
 }
 
@@ -57,6 +61,8 @@ export async function checkLeetCodePotd(username: string): Promise<LeetCodePotdR
   const date: string = potd.date;
   const titleSlug: string = potd.question.titleSlug;
   const title: string = potd.question.title;
+  const difficulty: string = potd.question.difficulty;
+  const questionNumber: string = potd.question.questionFrontendId;
 
   const recent: Array<{ titleSlug: string; timestamp: string }> =
     json.data?.recentAcSubmissionList ?? [];
@@ -67,5 +73,5 @@ export async function checkLeetCodePotd(username: string): Promise<LeetCodePotdR
     return subDateUtc === date;
   });
 
-  return { date, titleSlug, title, solved };
+  return { date, titleSlug, title, difficulty, questionNumber, solved };
 }

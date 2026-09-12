@@ -177,6 +177,7 @@ export function defaultActivityForm(): import("@/lib/types").ActivityFormInput {
     automation_type: "none",
     leetcode_username: "",
     preferred_complete_by: null,
+    notification_template: null,
     gfg_username: "",
     screentime_platform: null,
   };

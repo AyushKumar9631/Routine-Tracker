@@ -67,6 +67,7 @@ export async function createActivity(input: ActivityFormInput) {
       user_id: user.id,
       leetcode_username: username,
       preferred_complete_by: input.preferred_complete_by || null,
+      notification_template: input.notification_template || null,
     });
     if (configError) throw new Error(configError.message);
   } else if (isGfg) {
@@ -157,6 +158,7 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
           user_id: user.id,
           leetcode_username: username,
           preferred_complete_by: input.preferred_complete_by || null,
+          notification_template: input.notification_template || null,
         },
         { onConflict: "activity_id" }
       );
