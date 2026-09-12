@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { syncGfgActivity } from "@/lib/gfg-sync";
 
-export async function getGfgUsername(activityId: string): Promise<string> {
+export async function getGfgConfig(activityId: string): Promise<{
+  gfg_username: string;
+  preferred_complete_by: string | null;
+  notification_template: string | null;
+}> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -13,12 +17,16 @@ export async function getGfgUsername(activityId: string): Promise<string> {
 
   const { data } = await supabase
     .from("gfg_potd_config")
-    .select("gfg_username")
+    .select("gfg_username, preferred_complete_by, notification_template")
     .eq("activity_id", activityId)
     .eq("user_id", user.id)
     .maybeSingle();
 
-  return data?.gfg_username ?? "";
+  return {
+    gfg_username: data?.gfg_username ?? "",
+    preferred_complete_by: data?.preferred_complete_by ?? null,
+    notification_template: data?.notification_template ?? null,
+  };
 }
 
 export type GfgSyncOutcome =

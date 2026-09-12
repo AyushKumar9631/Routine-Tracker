@@ -5,7 +5,7 @@ import { Modal } from "@/components/ui/modal";
 import { ActivityFormFields } from "@/components/activity-form-fields";
 import { updateActivity, deleteActivity } from "@/actions/activities";
 import { getLeetcodeConfig } from "@/actions/leetcode";
-import { getGfgUsername } from "@/actions/gfg";
+import { getGfgConfig } from "@/actions/gfg";
 import { getScreentimeConfig } from "@/actions/screentime";
 import type { Activity, ActivityFormInput } from "@/lib/types";
 
@@ -67,7 +67,18 @@ export function EditActivityDialog({ activity }: { activity: Activity }) {
         )
       );
     } else if (activity.automation_type === "gfg_potd") {
-      getGfgUsername(activity.id).then((username) => setValue(toFormInput(activity, "", username)));
+      getGfgConfig(activity.id).then((config) =>
+        setValue(
+          toFormInput(
+            activity,
+            "",
+            config.gfg_username,
+            null,
+            config.preferred_complete_by,
+            config.notification_template
+          )
+        )
+      );
     } else if (activity.automation_type === "screen_time") {
       getScreentimeConfig(activity.id).then((config) =>
         setValue(toFormInput(activity, "", "", config?.platform ?? "ios"))

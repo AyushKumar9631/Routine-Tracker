@@ -3,7 +3,7 @@
 import type { ActivityFormInput, CompletionType, Period } from "@/lib/types";
 import { DAY_NAMES } from "@/lib/types";
 import { ScreentimeSetupPanel } from "@/components/screentime-setup-panel";
-import { DEFAULT_NOTIFICATION_TEMPLATE } from "@/lib/notification-template";
+import { DEFAULT_NOTIFICATION_TEMPLATE, DEFAULT_GFG_NOTIFICATION_TEMPLATE } from "@/lib/notification-template";
 import { automationDefaults } from "@/lib/utils";
 
 export function ActivityFormFields({
@@ -141,6 +141,39 @@ export function ActivityFormFields({
             baseline, and it starts marking itself complete from the next streak
             increase onward.
           </p>
+
+          <div className="mt-3">
+            <label className="field-label">Complete by (optional)</label>
+            <input
+              type="time"
+              className="field-input"
+              value={value.preferred_complete_by ?? ""}
+              onChange={(e) =>
+                onChange({ preferred_complete_by: e.target.value === "" ? null : e.target.value })
+              }
+            />
+            <p className="mt-1 text-xs text-ink-soft">
+              Get a nudge if it&apos;s still unsolved by this time. Leave blank to default to
+              2 hours before the midnight deadline.
+            </p>
+          </div>
+
+          <div className="mt-3">
+            <label className="field-label">Notification message (optional)</label>
+            <textarea
+              className="field-input min-h-[64px] resize-y"
+              placeholder={DEFAULT_GFG_NOTIFICATION_TEMPLATE}
+              value={value.notification_template ?? ""}
+              onChange={(e) =>
+                onChange({ notification_template: e.target.value === "" ? null : e.target.value })
+              }
+            />
+            <p className="mt-1 text-xs text-ink-soft">
+              Leave blank to use the default above. GFG doesn&apos;t expose the POTD&apos;s
+              name or difficulty (see the username note above), so the only variable
+              available is <code className="rounded bg-paper px-1 py-0.5">{"{streak}"}</code>.
+            </p>
+          </div>
         </div>
       )}
 

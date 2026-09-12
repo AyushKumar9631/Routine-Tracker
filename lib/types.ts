@@ -46,6 +46,9 @@ export interface GfgConfig {
   activity_id: string;
   user_id: string;
   gfg_username: string;
+  preferred_complete_by: string | null; // "HH:MM:SS", Asia/Kolkata wall clock
+  notification_template: string | null; // custom message; null = use the default
+  last_notified_on: string | null; // date, set once a deadline notification has sent today
   last_checked_at: string | null;
   last_known_streak: number | null;
   last_synced_date: string | null;
@@ -91,8 +94,8 @@ export interface ActivityFormInput {
 
   automation_type: "none" | "leetcode_potd" | "gfg_potd" | "screen_time";
   leetcode_username: string;
-  preferred_complete_by: string | null; // "HH:MM" from a <input type="time">, LeetCode only
-  notification_template: string | null; // LeetCode only; null = use the default
+  preferred_complete_by: string | null; // "HH:MM" from a <input type="time">, LeetCode + GFG
+  notification_template: string | null; // LeetCode + GFG; null = use the default
   gfg_username: string;
   screentime_platform: "ios" | "android" | null;
 }

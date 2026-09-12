@@ -77,6 +77,8 @@ export async function createActivity(input: ActivityFormInput) {
       activity_id: activity.id,
       user_id: user.id,
       gfg_username: username,
+      preferred_complete_by: input.preferred_complete_by || null,
+      notification_template: input.notification_template || null,
     });
     if (configError) throw new Error(configError.message);
   } else if (isScreenTime) {
@@ -171,7 +173,13 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
     const { error: configError } = await supabase
       .from("gfg_potd_config")
       .upsert(
-        { activity_id: id, user_id: user.id, gfg_username: username },
+        {
+          activity_id: id,
+          user_id: user.id,
+          gfg_username: username,
+          preferred_complete_by: input.preferred_complete_by || null,
+          notification_template: input.notification_template || null,
+        },
         { onConflict: "activity_id" }
       );
     if (configError) throw new Error(configError.message);
