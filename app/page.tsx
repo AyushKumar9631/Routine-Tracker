@@ -5,9 +5,10 @@ import { ActivityRow } from "@/components/activity-row";
 import { AddActivityDialog } from "@/components/add-activity-dialog";
 import { ScreenTimeTodayCard } from "@/components/screentime-today-card";
 import { EmptyState } from "@/components/empty-state";
+import { RecruitmentRow } from "@/components/recruitment-row";
 import type { Activity, Completion, RecruitmentDetails, RecruitmentRound } from "@/lib/types";
 import { computeScreenTimeStats } from "@/lib/screentime";
-import { currentRound, ROUND_TYPE_LABELS } from "@/lib/recruitment";
+import { currentRound } from "@/lib/recruitment";
 import { deadlineFor, formatDayLabel, isDueOn, kolkataToday, msUntilDeadline, todayKey } from "@/lib/utils";
 
 export default async function DashboardPage() {
@@ -230,10 +231,6 @@ export default async function DashboardPage() {
           active whether or not anything routine is due today, and it must
           never affect the "Nothing on the log today" / "Clear day" copy or
           the done/total tally, which are both about routine activities only.
-
-          NOTE(Task C2): this renders a plain placeholder row for now. C2
-          replaces it with a real <RecruitmentRow /> (countdown, inline
-          "set the date" control, "Log result" action) — see the plan doc.
         */}
         {activeDrives.length > 0 && (
           <div className="mt-10">
@@ -243,16 +240,7 @@ export default async function DashboardPage() {
             </div>
             <ul>
               {activeDrives.map(({ activity, details, round }) => (
-                <li key={activity.id} className="border-b border-line py-3">
-                  <p className="text-sm text-ink">
-                    {details.company_name}{" "}
-                    <span className="text-ink-soft">&mdash; {details.role}</span>
-                  </p>
-                  <p className="text-xs text-ink-soft">
-                    Round {round.round_no} &middot; {ROUND_TYPE_LABELS[round.round_type]}
-                    {round.test_date ? ` \u00b7 ${round.test_date}` : " \u00b7 no date set yet"}
-                  </p>
-                </li>
+                <RecruitmentRow key={activity.id} activity={activity} details={details} round={round} />
               ))}
             </ul>
           </div>
