@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { addNextRound, markDriveDone, setRoundTestDate, submitRoundResult } from "@/actions/recruitment";
 import { RecruitmentCountdownBadge, useRecruitmentCountdown } from "@/components/recruitment-countdown";
-import { ROUND_TYPE_LABELS } from "@/lib/recruitment";
-import type { Activity, RecruitmentDetails, RecruitmentRound, RoundResult } from "@/lib/types";
+import { isSelfAssessment, RESULT_LABELS, ROUND_TYPE_LABELS } from "@/lib/recruitment";
+import type { Activity, RecruitmentDetails, RecruitmentRound, RoundResult, RoundType } from "@/lib/types";
 import { todayKey } from "@/lib/utils";
 
 const LOG_RESULT_OPTIONS: { value: RoundResult; label: string }[] = [
@@ -13,17 +14,25 @@ const LOG_RESULT_OPTIONS: { value: RoundResult; label: string }[] = [
   { value: "passed", label: "Passed" },
 ];
 
+// Duplicated from recruitment-form-fields.tsx rather than shared — that
+// file isn't in this task's file list, so this stays a small local copy
+// rather than reaching in to hoist a shared export.
+const ROUND_TYPE_OPTIONS: RoundType[] = ["oa", "communication", "technical", "hr", "other"];
+
 /**
- * One active drive's current round on the Today page: company/role/round
- * badge, then either the inline date-setter (no test_date yet) or the
- * multi-day countdown (test_date set), plus the always-visible "Log result"
- * action from plan section 1.4.
+ * One active drive's current round on the Today page. Two layouts, chosen
+ * purely from server truth (round.result), so they hold up across a page
+ * reload and not just within one session:
  *
- * The date-setter and result buttons are visual/interactive shells only —
- * `setRoundTestDate` / `submitRoundResult` / `addNextRound` / `markDriveDone`
- * are Task C3's job (see the plan's C2/C3 split), so both are wired to
- * disabled stubs marked with `TODO(Task C3)` at the exact swap points,
- * mirroring how Task B1 left its Save button disabled for B2.
+ * - Normal state (result is "awaiting", "confident", or "not_sure"): company/
+ *   role/round badge, the date-setter or countdown, and the always-visible
+ *   "Log result" action from 1.4. A "rejected" result is never seen here —
+ *   it flips recruitment_details.status to "done" server-side, so the drive
+ *   drops out of Today's active-drives query entirely before this component
+ *   would ever render it with that result.
+ * - Passed-and-unresolved state (result === "passed"): the drive is still
+ *   active but this round is done, so the row swaps to the "another round,
+ *   or done?" follow-up from 1.4 instead of the countdown/log-result UI.
  */
 export function RecruitmentRow({
   activity,
@@ -34,10 +43,74 @@ export function RecruitmentRow({
   details: RecruitmentDetails;
   round: RecruitmentRound;
 }) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
   const [dateInput, setDateInput] = useState(round.test_date ?? "");
   const [showResultOptions, setShowResultOptions] = useState(false);
 
+  const [showAddRoundForm, setShowAddRoundForm] = useState(false);
+  const [nextRoundType, setNextRoundType] = useState<RoundType>("oa");
+  const [nextTestDate, setNextTestDate] = useState("");
+
   const countdown = useRecruitmentCountdown(round.test_date);
+
+  // This component doesn't remount when addNextRound swaps in a new current
+  // round (same activity.id key in the parent list) — resync local UI state
+  // whenever the round identity actually changes, so a stale date/expanded
+  // panel from the previous round doesn't linger.
+  useEffect(() => {
+    setDateInput(round.test_date ?? "");
+    setShowResultOptions(false);
+    setShowAddRoundForm(false);
+    setError(null);
+  }, [round.id, round.test_date]);
+
+  function handleSetDate() {
+    if (!dateInput) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        await setRoundTestDate(round.id, dateInput);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to save date");
+      }
+    });
+  }
+
+  function handleSubmitResult(value: RoundResult) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await submitRoundResult(round.id, value);
+        setShowResultOptions(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to log result");
+      }
+    });
+  }
+
+  function handleAddNextRound() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await addNextRound(activity.id, nextRoundType, nextTestDate || undefined);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to add round");
+      }
+    });
+  }
+
+  function handleMarkDone() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await markDriveDone(activity.id, "offer");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to mark drive done");
+      }
+    });
+  }
 
   return (
     <li className="border-b border-line py-4 last:border-b-0" data-activity-id={activity.id}>
@@ -60,75 +133,134 @@ export function RecruitmentRow({
           </p>
           <p className="mt-0.5 text-xs text-ink-soft">
             Round {round.round_no} &middot; {ROUND_TYPE_LABELS[round.round_type]}
+            {isSelfAssessment(round.result) && (
+              <span className="text-ink"> &middot; {RESULT_LABELS[round.result]}</span>
+            )}
           </p>
         </div>
 
-        {round.test_date && <RecruitmentCountdownBadge {...countdown} />}
+        {round.result !== "passed" && round.test_date && <RecruitmentCountdownBadge {...countdown} />}
       </div>
 
-      {!round.test_date && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="w-40">
-            <input
-              type="date"
-              className="field-input"
-              min={todayKey()}
-              value={dateInput}
-              onChange={(e) => setDateInput(e.target.value)}
-            />
+      {round.result === "passed" ? (
+        <div className="mt-3 rounded border border-line bg-card px-3 py-3">
+          <p className="text-xs text-ink">Passed this round &mdash; add another round, or mark it done?</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAddRoundForm((v) => !v)}
+              disabled={isPending}
+              className="rounded border border-line px-2 py-1 text-xs text-ink-soft transition-colors hover:border-moss hover:text-ink disabled:opacity-50"
+            >
+              {showAddRoundForm ? "Cancel" : "Add another round"}
+            </button>
+            <button
+              type="button"
+              onClick={handleMarkDone}
+              disabled={isPending}
+              className="rounded bg-moss px-2 py-1 text-xs text-paper transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {isPending ? "Saving\u2026" : "Mark drive done (offer)"}
+            </button>
           </div>
-          {/*
-            TODO(Task C3): wire to setRoundTestDate(round.id, dateInput).
-            Leaving this disabled for now — per 1.4 an unset date is fine and
-            non-blocking, so there's nothing broken about shipping the input
-            without a working Save yet.
-          */}
-          <button
-            type="button"
-            disabled
-            title="Wiring lands in Task C3"
-            className="rounded border border-line px-2 py-1 text-xs text-ink-soft opacity-50"
-          >
-            Save date
-          </button>
-          <span className="text-xs text-ink-soft">
-            optional &mdash; leave blank and Today will keep asking
-          </span>
+
+          {showAddRoundForm && (
+            <div className="mt-3 flex flex-wrap items-end gap-2">
+              <div>
+                <label className="field-label">Round type</label>
+                <select
+                  className="field-input"
+                  value={nextRoundType}
+                  onChange={(e) => setNextRoundType(e.target.value as RoundType)}
+                  disabled={isPending}
+                >
+                  {ROUND_TYPE_OPTIONS.map((type) => (
+                    <option key={type} value={type}>
+                      {ROUND_TYPE_LABELS[type]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-40">
+                <label className="field-label">Test date (optional)</label>
+                <input
+                  type="date"
+                  className="field-input"
+                  min={todayKey()}
+                  value={nextTestDate}
+                  onChange={(e) => setNextTestDate(e.target.value)}
+                  disabled={isPending}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleAddNextRound}
+                disabled={isPending}
+                className="rounded bg-moss px-3 py-2 text-xs text-paper transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {isPending ? "Adding\u2026" : "Add round"}
+              </button>
+            </div>
+          )}
         </div>
+      ) : (
+        <>
+          {!round.test_date && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="w-40">
+                <input
+                  type="date"
+                  className="field-input"
+                  min={todayKey()}
+                  value={dateInput}
+                  onChange={(e) => setDateInput(e.target.value)}
+                  disabled={isPending}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleSetDate}
+                disabled={isPending || !dateInput}
+                className="rounded border border-line px-2 py-1 text-xs text-ink-soft transition-colors hover:border-moss hover:text-ink disabled:opacity-50"
+              >
+                {isPending ? "Saving\u2026" : "Save date"}
+              </button>
+              <span className="text-xs text-ink-soft">
+                optional &mdash; leave blank and Today will keep asking
+              </span>
+            </div>
+          )}
+
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowResultOptions((v) => !v)}
+              disabled={isPending}
+              className="rounded border border-line px-2 py-1 text-xs text-ink-soft transition-colors hover:border-moss hover:text-ink disabled:opacity-50"
+            >
+              {showResultOptions ? "Hide result options" : "Log result"}
+            </button>
+
+            {showResultOptions && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {LOG_RESULT_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => handleSubmitResult(option.value)}
+                    disabled={isPending}
+                    className="rounded border border-line px-2 py-1 text-xs text-ink-soft transition-colors hover:border-moss hover:text-ink disabled:opacity-50"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
-      <div className="mt-3">
-        <button
-          type="button"
-          onClick={() => setShowResultOptions((v) => !v)}
-          className="rounded border border-line px-2 py-1 text-xs text-ink-soft transition-colors hover:border-moss hover:text-ink"
-        >
-          {showResultOptions ? "Hide result options" : "Log result"}
-        </button>
-
-        {showResultOptions && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {LOG_RESULT_OPTIONS.map((option) => (
-              /*
-                TODO(Task C3): wire to submitRoundResult(round.id, option.value).
-                "passed" additionally needs the "another round or done?"
-                follow-up prompt from 1.4 (addNextRound / markDriveDone) —
-                that's C3's job too, not built here.
-              */
-              <button
-                key={option.value}
-                type="button"
-                disabled
-                title="Wiring lands in Task C3"
-                className="rounded border border-line px-2 py-1 text-xs text-ink-soft opacity-50"
-              >
-                {option.label}
-              </button>
-            ))}
-            <span className="text-xs text-ink-soft">submit wires up in Task C3</span>
-          </div>
-        )}
-      </div>
+      {error && <p className="mt-2 text-xs text-rust">{error}</p>}
     </li>
   );
 }
