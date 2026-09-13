@@ -5,8 +5,9 @@ import { ActivityRow } from "@/components/activity-row";
 import { AddActivityDialog } from "@/components/add-activity-dialog";
 import { ScreenTimeTodayCard } from "@/components/screentime-today-card";
 import { EmptyState } from "@/components/empty-state";
-import type { Activity, Completion } from "@/lib/types";
+import type { Activity, Completion, RecruitmentDetails, RecruitmentRound } from "@/lib/types";
 import { computeScreenTimeStats } from "@/lib/screentime";
+import { currentRound, ROUND_TYPE_LABELS } from "@/lib/recruitment";
 import { deadlineFor, formatDayLabel, isDueOn, kolkataToday, msUntilDeadline, todayKey } from "@/lib/utils";
 
 export default async function DashboardPage() {
@@ -28,10 +29,17 @@ export default async function DashboardPage() {
   const today = kolkataToday(now);
   const key = todayKey(now);
 
+  // Recruitment drives are a different `kind` of activity entirely — they
+  // never have a period/deadline and must never enter the due-today/done
+  // tally below. Pulled out up front, same precedent as Screen Time being
+  // pulled out of taskActivities just below.
+  const routineActivities = all.filter((a) => a.kind !== "recruitment");
+  const recruitmentActivities = all.filter((a) => a.kind === "recruitment");
+
   // Screen Time is a passive daily readout, not a task with a deadline — it
   // gets its own gauge card up top instead of a row in the log below.
-  const screenTimeActivity = all.find((a) => a.automation_type === "screen_time") ?? null;
-  const taskActivities = all.filter((a) => a.automation_type !== "screen_time");
+  const screenTimeActivity = routineActivities.find((a) => a.automation_type === "screen_time") ?? null;
+  const taskActivities = routineActivities.filter((a) => a.automation_type !== "screen_time");
   const dueToday = taskActivities.filter((a) => isDueOn(a, today));
 
   let completions: Completion[] = [];
@@ -67,6 +75,51 @@ export default async function DashboardPage() {
       .eq("activity_id", screenTimeActivity.id)
       .maybeSingle();
     screenTimeLastSyncedAt = config?.last_synced_at ?? null;
+  }
+
+  // Active recruitment drives + each one's current round. A drive only shows
+  // here while recruitment_details.status = 'active' — once rejected or
+  // turned into an offer it drops out of Today and only appears in history
+  // (a later task).
+  type ActiveDrive = { activity: Activity; details: RecruitmentDetails; round: RecruitmentRound };
+  let activeDrives: ActiveDrive[] = [];
+
+  if (recruitmentActivities.length > 0) {
+    const recruitmentIds = recruitmentActivities.map((a) => a.id);
+
+    const { data: detailsData } = await supabase
+      .from("recruitment_details")
+      .select("*")
+      .in("activity_id", recruitmentIds)
+      .eq("status", "active");
+    const activeDetails = (detailsData ?? []) as RecruitmentDetails[];
+    const activeIds = activeDetails.map((d) => d.activity_id);
+
+    const roundsByActivity = new Map<string, RecruitmentRound[]>();
+    if (activeIds.length > 0) {
+      const { data: roundsData } = await supabase
+        .from("recruitment_rounds")
+        .select("*")
+        .in("activity_id", activeIds);
+      for (const round of (roundsData ?? []) as RecruitmentRound[]) {
+        const list = roundsByActivity.get(round.activity_id) ?? [];
+        list.push(round);
+        roundsByActivity.set(round.activity_id, list);
+      }
+    }
+
+    const activityById = new Map(recruitmentActivities.map((a) => [a.id, a]));
+    const detailsByActivity = new Map(activeDetails.map((d) => [d.activity_id, d]));
+
+    activeDrives = activeIds
+      .map((id) => {
+        const activity = activityById.get(id);
+        const details = detailsByActivity.get(id);
+        const round = currentRound(roundsByActivity.get(id) ?? []);
+        if (!activity || !details || !round) return null;
+        return { activity, details, round };
+      })
+      .filter((d): d is ActiveDrive => d !== null);
   }
 
   const completionByActivity = new Map(completions.map((c) => [c.activity_id, c]));
@@ -170,6 +223,39 @@ export default async function DashboardPage() {
               </div>
             )}
           </>
+        )}
+
+        {/*
+          Deliberately outside the ternary above: a recruitment drive can be
+          active whether or not anything routine is due today, and it must
+          never affect the "Nothing on the log today" / "Clear day" copy or
+          the done/total tally, which are both about routine activities only.
+
+          NOTE(Task C2): this renders a plain placeholder row for now. C2
+          replaces it with a real <RecruitmentRow /> (countdown, inline
+          "set the date" control, "Log result" action) — see the plan doc.
+        */}
+        {activeDrives.length > 0 && (
+          <div className="mt-10">
+            <div className="mb-1 flex items-center gap-3">
+              <h2 className="shrink-0 text-xs text-ink-soft">Recruitment ({activeDrives.length})</h2>
+              <div className="h-px flex-1 bg-line" />
+            </div>
+            <ul>
+              {activeDrives.map(({ activity, details, round }) => (
+                <li key={activity.id} className="border-b border-line py-3">
+                  <p className="text-sm text-ink">
+                    {details.company_name}{" "}
+                    <span className="text-ink-soft">&mdash; {details.role}</span>
+                  </p>
+                  <p className="text-xs text-ink-soft">
+                    Round {round.round_no} &middot; {ROUND_TYPE_LABELS[round.round_type]}
+                    {round.test_date ? ` \u00b7 ${round.test_date}` : " \u00b7 no date set yet"}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </main>
     </div>
