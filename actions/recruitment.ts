@@ -11,6 +11,30 @@ import type {
   RoundType,
 } from "@/lib/types";
 
+/**
+ * Fires the F2/F3 AI research passes (company overview + round prep) without
+ * blocking the caller — an un-awaited fetch to app/api/ai/recruitment-enrich,
+ * intentionally not awaited so activity/round creation never waits on Groq.
+ * Errors are swallowed here on purpose: a failed trigger just leaves the
+ * insight absent/pending, which the detail page's retry action (F4) covers.
+ */
+function triggerRecruitmentEnrich(activityId: string, roundId?: string) {
+  const appUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "http://localhost:3000";
+
+  fetch(`${appUrl}/api/ai/recruitment-enrich`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify({ activityId, roundId }),
+  }).catch((err) => {
+    console.error("triggerRecruitmentEnrich: fire-and-forget fetch failed", err);
+  });
+}
+
 export async function createRecruitmentActivity(input: RecruitmentFormInput) {
   const supabase = await createClient();
   const {
@@ -56,22 +80,26 @@ export async function createRecruitmentActivity(input: RecruitmentFormInput) {
     });
     if (detailsError) throw new Error(detailsError.message);
 
-    const { error: roundError } = await supabase.from("recruitment_rounds").insert({
-      activity_id: activity.id,
-      user_id: user.id,
-      round_no: 1,
-      round_type: input.round_type,
-      test_date: testDate,
-    });
+    const { data: round1, error: roundError } = await supabase
+      .from("recruitment_rounds")
+      .insert({
+        activity_id: activity.id,
+        user_id: user.id,
+        round_no: 1,
+        round_type: input.round_type,
+        test_date: testDate,
+      })
+      .select("id")
+      .single();
     if (roundError) throw new Error(roundError.message);
+
+    // Fire-and-forget: company overview (round_id = null) + round prep for
+    // round 1. Deliberately not awaited — see triggerRecruitmentEnrich above.
+    triggerRecruitmentEnrich(activity.id, round1.id);
   } catch (err) {
     await supabase.from("activities").delete().eq("id", activity.id);
     throw err;
   }
-
-  // TODO(Phase F): trigger the AI research passes here — company overview
-  // (round_id = null) and round prep for this round 1 — fire-and-forget, must
-  // not block this action's return. See plan doc section 1.6 / task F3.
 
   revalidatePath("/");
   revalidatePath("/activities");
@@ -178,18 +206,22 @@ export async function addNextRound(activityId: string, roundType: RoundType, tes
 
   const roundNo = nextRoundNo((existingRounds ?? []) as RecruitmentRound[]);
 
-  const { error: insertError } = await supabase.from("recruitment_rounds").insert({
-    activity_id: activityId,
-    user_id: user.id,
-    round_no: roundNo,
-    round_type: roundType,
-    test_date: testDate || null,
-  });
+  const { data: newRound, error: insertError } = await supabase
+    .from("recruitment_rounds")
+    .insert({
+      activity_id: activityId,
+      user_id: user.id,
+      round_no: roundNo,
+      round_type: roundType,
+      test_date: testDate || null,
+    })
+    .select("id")
+    .single();
   if (insertError) throw new Error(insertError.message);
 
-  // TODO(Phase F): trigger round-prep AI pass here — for this new round
-  // (kind='round_prep', round_id = the row just inserted) — fire-and-forget,
-  // must not block this action's return. See plan doc section 1.6 / task F3.
+  // Fire-and-forget round prep for the new round. Company overview is
+  // already ready by this point, so the enrich route just skips that half.
+  triggerRecruitmentEnrich(activityId, newRound.id);
 
   revalidatePath("/");
   revalidatePath("/activities");
