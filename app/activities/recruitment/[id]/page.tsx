@@ -4,8 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { Nav } from "@/components/nav";
 import { ActivityIcon } from "@/components/activity-icon";
 import { RecruitmentRow } from "@/components/recruitment-row";
+import { RecruitmentInsightSection } from "@/components/recruitment-insight-section";
 import { currentRound, RESULT_LABELS, ROUND_TYPE_LABELS, sortRounds } from "@/lib/recruitment";
-import type { Activity, RecruitmentDetails, RecruitmentRound } from "@/lib/types";
+import type { Activity, RecruitmentAiInsight, RecruitmentDetails, RecruitmentRound } from "@/lib/types";
+import type { CompanyOverviewContent, RoundPrepContent } from "@/app/api/ai/recruitment-enrich/route";
 import { cn } from "@/lib/utils";
 
 /** Read-only line for any round that isn't the current one (see 1.4 — every
@@ -64,6 +66,18 @@ export default async function RecruitmentDetailPage({
   const current = currentRound(rounds);
   const olderRounds = current ? rounds.filter((r) => r.id !== current.id) : rounds;
 
+  const { data: insightsData } = await supabase
+    .from("recruitment_ai_insights")
+    .select("*")
+    .eq("activity_id", id);
+  const insights = (insightsData ?? []) as RecruitmentAiInsight[];
+  const companyOverview = insights.find((i) => i.kind === "company_overview" && i.round_id === null);
+  const roundPrep = current
+    ? insights.find((i) => i.kind === "round_prep" && i.round_id === current.id)
+    : undefined;
+  const overviewContent = companyOverview?.content as CompanyOverviewContent | undefined;
+  const roundPrepContent = roundPrep?.content as RoundPrepContent | undefined;
+
   return (
     <div className="min-h-screen">
       <Nav />
@@ -118,19 +132,48 @@ export default async function RecruitmentDetailPage({
           </ul>
         </section>
 
-        {/* TODO(Phase F): company overview (recruitment_ai_insights, kind='company_overview')
-            pending/ready/failed states land here — see plan doc task F4. */}
-        <section className="mb-10">
-          <h2 className="mb-3 text-sm text-ink-soft">Company overview</h2>
-          <p className="text-sm text-ink-soft">AI research coming soon.</p>
-        </section>
+        <RecruitmentInsightSection
+          title="Company overview"
+          activityId={activity.id}
+          roundId={current?.id}
+          status={companyOverview?.status ?? "missing"}
+          error={companyOverview?.error}
+        >
+          {overviewContent && (
+            <div className="text-sm text-ink">
+              <p>{overviewContent.summary}</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-ink-soft">
+                {overviewContent.highlights.map((h, i) => (
+                  <li key={i}>{h}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </RecruitmentInsightSection>
 
-        {/* TODO(Phase F): round prep for the current round (recruitment_ai_insights,
-            kind='round_prep', round_id=current.id) lands here — see task F4. */}
-        <section className="mb-10">
-          <h2 className="mb-3 text-sm text-ink-soft">Round prep</h2>
-          <p className="text-sm text-ink-soft">AI research coming soon.</p>
-        </section>
+        {current && (
+          <RecruitmentInsightSection
+            title="Round prep"
+            activityId={activity.id}
+            roundId={current.id}
+            status={roundPrep?.status ?? "missing"}
+            error={roundPrep?.error}
+          >
+            {roundPrepContent && (
+              <div className="text-sm text-ink">
+                <p className="text-ink-soft">
+                  {roundPrepContent.format} &middot; {roundPrepContent.duration} &middot;{" "}
+                  {roundPrepContent.questionCount}
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-ink-soft">
+                  {roundPrepContent.topics.map((t, i) => (
+                    <li key={i}>{t}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </RecruitmentInsightSection>
+        )}
 
         {/* TODO(Phase G): recruitment-chat.tsx (recruitment_chat_messages) lands
             here — see plan doc tasks G1/G2. */}

@@ -250,3 +250,32 @@ export async function markDriveDone(activityId: string, outcome: FinalOutcome) {
   revalidatePath("/");
   revalidatePath("/activities");
 }
+
+/**
+ * F4's "Retry" action on a failed (or still-missing) AI insight. Just
+ * re-fires the same fire-and-forget trigger used at creation time —
+ * ensurePendingInsight on the enrich route resets that one row to `pending`
+ * and reruns it rather than piling up duplicates. Ownership is checked here
+ * (unlike the enrich route itself, which trusts its CRON_SECRET caller)
+ * since this action is reachable directly from the client.
+ */
+export async function retryRecruitmentInsight(activityId: string, roundId?: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { data: details, error } = await supabase
+    .from("recruitment_details")
+    .select("activity_id")
+    .eq("activity_id", activityId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!details) throw new Error("Recruitment drive not found");
+
+  triggerRecruitmentEnrich(activityId, roundId);
+
+  revalidatePath(`/activities/recruitment/${activityId}`);
+}

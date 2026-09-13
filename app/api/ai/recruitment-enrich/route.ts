@@ -17,15 +17,15 @@ import { ROUND_TYPE_LABELS } from "@/lib/recruitment";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Shapes stored in recruitment_ai_insights.content — kept local to this route
-// since nothing else writes these rows yet; F4 (detail-page UI) reads the
-// same two shapes back out and should mirror these types when it lands.
-interface CompanyOverviewContent {
+// Shapes stored in recruitment_ai_insights.content. Exported (type-only
+// consumers, e.g. the F4 detail page) so nothing has to re-derive or drift
+// from what this route actually writes.
+export interface CompanyOverviewContent {
   summary: string;
   highlights: string[];
 }
 
-interface RoundPrepContent {
+export interface RoundPrepContent {
   topics: string[];
   duration: string;
   format: string;
