@@ -76,6 +76,56 @@ problem slug shows up in recent ACs with a timestamp on today's UTC date.
 The date check guards against LeetCode reusing an old problem as POTD,
 where an old accepted submission for that slug would otherwise false-match.
 
+## 6. Recruitment tracker (drives, AI research, chat)
+
+1. SQL Editor → run, in order:
+   - `supabase/migrations/014_recruitment_schema.sql` (adds `activities.kind`,
+     `recruitment_details`, `recruitment_rounds`, `recruitment_ai_insights`,
+     `recruitment_chat_messages`, RLS included).
+   - `supabase/migrations/015_pg_cron_recruitment_notify.sql` (schedules the
+     30-minute reminder check). Reuses the `app_url` / `cron_secret` vault
+     entries already created in step 5's migration 005 — no new secrets.
+2. Sign up for a free Groq account at [console.groq.com](https://console.groq.com)
+   (no credit card needed) and create an API key.
+3. Add to `.env.local` / Vercel env vars:
+   - `GROQ_API_KEY` — the key from step 2. Server-only — never expose it with
+     a `NEXT_PUBLIC_` prefix.
+   - `CRON_SECRET` is reused from step 5 (same value) — the AI research route
+     is gated with it too, so nothing new to add there if you already did
+     step 5.
+4. In the app: **+ Add activity** → **Recruitment Drive** tile → enter
+   company name, role, and round 1's type (OA/Communication/Technical/HR/
+   Other); the test date is optional and can be filled in later from Today.
+5. Reminder pushes reuse the same ntfy topic set up in **Notification
+   settings** as every other automation — nothing recruitment-specific to
+   configure there.
+
+How it works:
+
+- **Creating a drive** (or logging "Passed" → "Another round") fires a
+  fire-and-forget request to `app/api/ai/recruitment-enrich` — not awaited by
+  the create/progress action, so it never blocks the UI. That route makes two
+  chained calls to Groq's `openai/gpt-oss-120b` model (with its native
+  `browser_search` tool, so it can look up live info): a one-time **company
+  overview** per drive, and a **round prep** (expected topics/duration/
+  format/question count) for each round. Each starts as a `pending` row in
+  `recruitment_ai_insights` and flips to `ready` or `failed` when the call
+  returns, so the detail page can show a "Researching…" state and fill in on
+  its own (or offer a retry on failure) instead of blocking anything.
+- **Chat** (`app/api/ai/recruitment-chat`) uses the same model with no
+  `browser_search` — it's grounded in the drive's stored context (company/
+  role/current round/whatever research has finished) plus the running
+  transcript, not fresh lookups on every message. Every exchange is saved to
+  `recruitment_chat_messages`, but only after a reply actually comes back —
+  a failed call leaves nothing half-saved.
+- **Reminders**: `supabase/migrations/015...sql` schedules a pg_cron job every
+  30 minutes (a deliberately slower cadence than the LeetCode/GFG 5-minute
+  jobs, since these windows are hour-wide, not minute-wide). It SQL-gates the
+  check so it only calls out to `app/api/cron/recruitment-notify` when some
+  round is actually due — an evening-before push once `test_date` is tomorrow
+  and it's ≥19:00 Kolkata time, or a morning-of push once `test_date` is today
+  and it's ≥09:00 — each a one-shot per round, not daily-repeating.
+
 ## Data model
 
 - **activities** — name, icon/color, `period` (daily/weekly/biweekly/monthly)
