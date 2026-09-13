@@ -92,11 +92,17 @@ export async function POST(request: Request) {
     { role: "user", content: message },
   ];
 
-  // No `withSearch` — chat is grounded in what's already been researched
-  // (1.6.B), not fresh lookups on every message.
+  // `withSearch: true` — chat now has the same `browser_search` tool the
+  // research passes use (plan 1.6.B explicitly reserved this as a flip-able
+  // option: "if a later task decides the chat should also be able to
+  // search, just add tools: [{"type": "browser_search"}] to its call").
+  // Passing the tool doesn't force a search on every turn — the model only
+  // invokes it when it decides the grounded context below isn't enough
+  // (e.g. the user explicitly asks it to look something up, or asks about
+  // something more current than what the research passes captured).
   let reply: string;
   try {
-    reply = await callGroq(messages);
+    reply = await callGroq(messages, true);
   } catch (err) {
     const errorMessage =
       err instanceof GroqApiError || err instanceof Error ? err.message : "AI request failed";
@@ -129,10 +135,12 @@ function buildSystemMessage(
 ): string {
   const lines: string[] = [
     "You are an interview-prep assistant helping the candidate get ready for this " +
-      "recruitment drive. Ground your answers in the context below; if something " +
-      "isn't covered by it, say so plainly rather than inventing specifics — you " +
-      "have no live web access here, unlike the research passes that produced this " +
-      "context.",
+      "recruitment drive. Ground your answers in the context below first. You also " +
+      "have a browser_search tool available — use it when the context below doesn't " +
+      "cover what's being asked (e.g. the user asks you to look something up, or " +
+      "wants something more current than what's in the research below), rather than " +
+      "guessing or inventing specifics. Don't feel obligated to search for every " +
+      "message — plain prep conversation grounded in the context below doesn't need it.",
     "",
     `Company: ${details.company_name}${details.company_url ? ` (${details.company_url})` : ""}`,
     `Role: ${details.role}`,

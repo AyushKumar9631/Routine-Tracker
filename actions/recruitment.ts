@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { nextRoundNo } from "@/lib/recruitment";
 import type {
@@ -13,8 +14,21 @@ import type {
 
 /**
  * Fires the F2/F3 AI research passes (company overview + round prep) without
- * blocking the caller — an un-awaited fetch to app/api/ai/recruitment-enrich,
- * intentionally not awaited so activity/round creation never waits on Groq.
+ * blocking the caller — a fetch to app/api/ai/recruitment-enrich, scheduled
+ * via Next's `after()` so activity/round creation never waits on Groq.
+ *
+ * BUGFIX (see plan H2 follow-up): this used to be a bare un-awaited
+ * `fetch(...).catch(...)` called directly inside the server action. That
+ * pattern is a known trap on serverless runtimes (Vercel included) — once
+ * the server action's response is sent back to the client, the function's
+ * execution context can be frozen/torn down immediately, cancelling any
+ * in-flight I/O that isn't explicitly kept alive. The fetch to the enrich
+ * route was being cut off before it ever reached Groq, which is exactly why
+ * `recruitment_ai_insights` rows never appeared and Groq's own request count
+ * never moved for these calls. `after()` (stable since Next 15.1) schedules
+ * the callback to run after the response finishes streaming while keeping
+ * the function alive until it settles — the correct tool for this, instead
+ * of `waitUntil()` boilerplate or a bespoke keep-alive hack.
  * Errors are swallowed here on purpose: a failed trigger just leaves the
  * insight absent/pending, which the detail page's retry action (F4) covers.
  */
@@ -23,16 +37,18 @@ function triggerRecruitmentEnrich(activityId: string, roundId?: string) {
     ? `https://${process.env.VERCEL_URL}`
     : "http://localhost:3000";
 
-  fetch(`${appUrl}/api/ai/recruitment-enrich`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify({ activityId, roundId }),
-  }).catch((err) => {
-    console.error("triggerRecruitmentEnrich: fire-and-forget fetch failed", err);
-  });
+  after(() =>
+    fetch(`${appUrl}/api/ai/recruitment-enrich`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      },
+      body: JSON.stringify({ activityId, roundId }),
+    }).catch((err) => {
+      console.error("triggerRecruitmentEnrich: after() fetch failed", err);
+    })
+  );
 }
 
 export async function createRecruitmentActivity(input: RecruitmentFormInput) {
