@@ -28,7 +28,11 @@ export function ActivityListItem({ activity }: { activity: Activity }) {
 
       <div className="min-w-0 flex-1">
         <Link
-          href={`/activities/${activity.id}`}
+          href={
+            activity.kind === "recruitment"
+              ? `/activities/recruitment/${activity.id}`
+              : `/activities/${activity.id}`
+          }
           className="block truncate text-sm text-ink hover:underline underline-offset-2"
         >
           {activity.name}
