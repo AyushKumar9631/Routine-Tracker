@@ -5,8 +5,15 @@ import { Nav } from "@/components/nav";
 import { ActivityIcon } from "@/components/activity-icon";
 import { RecruitmentRow } from "@/components/recruitment-row";
 import { RecruitmentInsightSection } from "@/components/recruitment-insight-section";
+import { RecruitmentChat } from "@/components/recruitment-chat";
 import { currentRound, RESULT_LABELS, ROUND_TYPE_LABELS, sortRounds } from "@/lib/recruitment";
-import type { Activity, RecruitmentAiInsight, RecruitmentDetails, RecruitmentRound } from "@/lib/types";
+import type {
+  Activity,
+  RecruitmentAiInsight,
+  RecruitmentChatMessage,
+  RecruitmentDetails,
+  RecruitmentRound,
+} from "@/lib/types";
 import type { CompanyOverviewContent, RoundPrepContent } from "@/app/api/ai/recruitment-enrich/route";
 import { cn } from "@/lib/utils";
 
@@ -77,6 +84,13 @@ export default async function RecruitmentDetailPage({
     : undefined;
   const overviewContent = companyOverview?.content as CompanyOverviewContent | undefined;
   const roundPrepContent = roundPrep?.content as RoundPrepContent | undefined;
+
+  const { data: chatMessagesData } = await supabase
+    .from("recruitment_chat_messages")
+    .select("*")
+    .eq("activity_id", id)
+    .order("created_at", { ascending: true });
+  const chatMessages = (chatMessagesData ?? []) as RecruitmentChatMessage[];
 
   return (
     <div className="min-h-screen">
@@ -175,11 +189,9 @@ export default async function RecruitmentDetailPage({
           </RecruitmentInsightSection>
         )}
 
-        {/* TODO(Phase G): recruitment-chat.tsx (recruitment_chat_messages) lands
-            here — see plan doc tasks G1/G2. */}
         <section>
           <h2 className="mb-3 text-sm text-ink-soft">Chat</h2>
-          <p className="text-sm text-ink-soft">Chat assistant coming soon.</p>
+          <RecruitmentChat activityId={activity.id} initialMessages={chatMessages} />
         </section>
       </main>
     </div>
