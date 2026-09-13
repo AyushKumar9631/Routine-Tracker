@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/modal";
 import { ActivityFormFields } from "@/components/activity-form-fields";
 import { RecruitmentFormFields } from "@/components/recruitment-form-fields";
 import { createActivity } from "@/actions/activities";
+import { createRecruitmentActivity } from "@/actions/recruitment";
 import { defaultActivityForm, defaultRecruitmentForm, automationDefaults } from "@/lib/utils";
 import type { ActivityFormInput, RecruitmentFormInput } from "@/lib/types";
 
@@ -83,20 +84,15 @@ export function AddActivityDialog() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
-    if (kind === "recruitment") {
-      // TODO(Task B2): call createRecruitmentActivity(recruitmentValue) here
-      // and close() on success, the same way the routine branch below does.
-      // The Save button is disabled while this is a TODO (see the button's
-      // `disabled` below), so this branch isn't reachable yet — guarded
-      // anyway in case that changes.
-      return;
-    }
-
     setSaving(true);
     setError("");
+
     try {
-      await createActivity(value);
+      if (kind === "recruitment") {
+        await createRecruitmentActivity(recruitmentValue);
+      } else {
+        await createActivity(value);
+      }
       close();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save that activity");
@@ -194,11 +190,10 @@ export function AddActivityDialog() {
               </button>
               <button
                 type="submit"
-                disabled={saving || kind === "recruitment"}
-                title={kind === "recruitment" ? "Saving lands in the next task" : undefined}
+                disabled={saving}
                 className="rounded bg-moss px-4 py-2 text-sm text-paper transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                {kind === "recruitment" ? "Coming soon" : saving ? "Saving\u2026" : "Save activity"}
+                {saving ? "Saving\u2026" : "Save activity"}
               </button>
             </div>
           </form>
