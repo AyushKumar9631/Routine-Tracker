@@ -39,6 +39,21 @@ export const DEFAULT_SCREENTIME_NOTIFICATION_TEMPLATES: Record<ScreenTimeNotifyT
   150: "Screen time is way past budget: {percent}% used ({minutes}/{limit} min). Time to put the phone down.",
 };
 
+// Recruitment reminders (see lib/recruitment-notify.ts + the pg_cron notify
+// job) have exactly two fixed variants, evening-before and morning-of — a
+// round has no notification_template column of its own the way LeetCode/GFG
+// configs do, so there's nothing per-user to fall back from here.
+export interface RecruitmentNotificationTemplateVars {
+  company: string; // recruitment_details.company_name
+  role: string; // recruitment_details.role
+  round_type: string; // ROUND_TYPE_LABELS[round.round_type], e.g. "Technical"
+}
+
+export const DEFAULT_RECRUITMENT_EVENING_TEMPLATE =
+  "Your {round_type} round with {company} ({role}) is tomorrow \u2014 get ready.";
+export const DEFAULT_RECRUITMENT_MORNING_TEMPLATE =
+  "Today's the day: {round_type} round with {company} ({role}). Good luck!";
+
 /**
  * Fills in `{key}` placeholders in a user-supplied template from a vars
  * object. Unrecognized placeholders are left as-is rather than stripped, so
