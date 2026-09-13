@@ -1,35 +1,53 @@
 // AI research endpoint for a recruitment drive (plan 1.6.A). One of the "new
 // AI endpoints" that's the stated exception to the server-actions-only rule
 // (1.1) — it exists as its own route (rather than a server action) so
-// actions/recruitment.ts can fire-and-forget an un-awaited fetch to it and
-// return immediately instead of blocking drive/round creation on the AI call.
+// actions/recruitment.ts can schedule (via next/server's after()) a fetch to
+// it and return immediately instead of blocking drive/round creation on the
+// AI call. See plan doc H3 for why that scheduling matters.
 //
 // Not a pg_cron endpoint and not a public webhook, but it's still reachable
 // without a user session (the trigger is a server-to-server fetch, not a
 // browser request), so it's gated the same way the cron routes are: bearer
 // CRON_SECRET. No new secret needed. This isn't spelled out in the plan —
 // flagged as a note under F3 in the checklist.
+//
+// H5 rework: each research pass used to be a single Groq call asking for a
+// whole JSON blob back. Now it's several small, independent, word-limited
+// questions (see COMPANY_OVERVIEW_QUESTIONS / ROUND_PREP_QUESTIONS below),
+// each run through the full model fallback chain (GROQ_RESEARCH_MODELS) on
+// its own. A question that fails on every model in the chain just comes
+// back blank in `content` — it does NOT fail the whole pass/row. This
+// trades a bit of latency (multiple small calls instead of one big one,
+// though they run concurrently via Promise.all) for much better resilience:
+// one exhausted model, or one topic Groq's search can't find anything on,
+// no longer takes out the whole company overview or round prep.
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { callGroq, GroqApiError, type GroqChatMessage } from "@/lib/ai/groq";
+import { callGroqWithFallback, GROQ_RESEARCH_MODELS, type GroqChatMessage } from "@/lib/ai/groq";
 import { ROUND_TYPE_LABELS } from "@/lib/recruitment";
+import {
+  COMPANY_OVERVIEW_QUESTIONS,
+  ROUND_PREP_QUESTIONS,
+  type CompanyOverviewContent,
+  type RoundPrepContent,
+} from "@/lib/ai/recruitment-research";
+
+// Re-exported type-only so existing `import type { ... } from ".../route"`
+// call sites keep working — type exports are erased at compile time and
+// don't trip Next's route-export validation the way a value export would
+// (that's exactly what moved COMPANY_OVERVIEW_FIELDS/ROUND_PREP_FIELDS out
+// to lib/ai/recruitment-research.ts in the first place).
+export type { CompanyOverviewContent, RoundPrepContent };
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Shapes stored in recruitment_ai_insights.content. Exported (type-only
-// consumers, e.g. the F4 detail page) so nothing has to re-derive or drift
-// from what this route actually writes.
-export interface CompanyOverviewContent {
-  summary: string;
-  highlights: string[];
-}
-
-export interface RoundPrepContent {
-  topics: string[];
-  duration: string;
-  format: string;
-  questionCount: string;
+interface DriveDetails {
+  activity_id: string;
+  user_id: string;
+  company_name: string;
+  company_url: string | null;
+  role: string;
 }
 
 export async function POST(request: Request) {
@@ -89,20 +107,13 @@ export async function POST(request: Request) {
 
 type PassOutcome = "ran" | "skipped" | "not requested";
 
-interface DriveDetails {
-  activity_id: string;
-  user_id: string;
-  company_name: string;
-  company_url: string | null;
-  role: string;
-}
-
 /**
  * Finds the existing insight row for this (activity/round, kind) if any.
  * `skip: true` means it's already `ready` and shouldn't be regenerated.
  * Otherwise returns an insight id reset to `pending` — either a freshly
  * inserted row or an existing failed/pending one being retried in place, so
- * a retry updates the same row rather than accumulating duplicates.
+ * a retry (or the H4 "Start research" button) updates the same row rather
+ * than accumulating duplicates.
  */
 async function ensurePendingInsight(
   supabase: ReturnType<typeof createAdminClient>,
@@ -142,57 +153,106 @@ async function ensurePendingInsight(
   return { id: inserted.id, skip: false };
 }
 
-/** Strips ```json fences the model adds despite being told not to, then parses. */
-function parseModelJson<T>(raw: string): T {
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-  return JSON.parse(cleaned) as T;
+function researchSystemPrompt(maxWords: number): string {
+  return (
+    "You are a research assistant helping a job candidate prep for an interview. " +
+    "Answer ONLY the question in the next message, in plain prose, no markdown, no " +
+    `preamble, no restating the question. Maximum ${maxWords} words. If you don't have ` +
+    'reliable information to answer, respond with exactly the single word "UNKNOWN" ' +
+    "and nothing else -- never invent specifics."
+  );
+}
+
+/** Model output that means "no answer" -- stored as null, not as text. */
+function isUnknown(text: string): boolean {
+  return /^unknown\.?$/i.test(text.trim());
+}
+
+/** Belt-and-suspenders word cap -- the prompt already asks for this, this
+ * guarantees it regardless of whether a given model actually complied. */
+function truncateWords(text: string, maxWords: number): string {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= maxWords) return text.trim();
+  return words.slice(0, maxWords).join(" ") + "\u2026";
+}
+
+function normalizeAnswer(raw: string, maxWords: number): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed || isUnknown(trimmed)) return null;
+  return truncateWords(trimmed, maxWords);
+}
+
+/**
+ * Runs one research pass: every question in `questions` fires as its own
+ * Groq call (through the full GROQ_RESEARCH_MODELS fallback chain),
+ * concurrently. A question that fails on every model in the chain is
+ * logged and stored as `null` -- it does not fail the pass. The row always
+ * ends up `ready` once we get this far (the only way this pass reports
+ * `"failed"` is if ensurePendingInsight itself throws, e.g. a genuine DB
+ * error, before any question is even attempted).
+ */
+async function runResearchPass<K extends string>(
+  supabase: ReturnType<typeof createAdminClient>,
+  params: {
+    activityId: string;
+    userId: string;
+    roundId: string | null;
+    kind: "company_overview" | "round_prep";
+    questions: { key: K; maxWords: number; userPrompt: string }[];
+  }
+): Promise<PassOutcome> {
+  const { id, skip } = await ensurePendingInsight(supabase, {
+    activityId: params.activityId,
+    userId: params.userId,
+    roundId: params.roundId,
+    kind: params.kind,
+  });
+  if (skip) return "skipped";
+
+  const answers = await Promise.all(
+    params.questions.map(async ({ key, maxWords, userPrompt }) => {
+      const messages: GroqChatMessage[] = [
+        { role: "system", content: researchSystemPrompt(maxWords) },
+        { role: "user", content: userPrompt },
+      ];
+      try {
+        const { text } = await callGroqWithFallback(messages, GROQ_RESEARCH_MODELS, {
+          withSearch: true,
+          maxTokens: 800,
+        });
+        return [key, normalizeAnswer(text, maxWords)] as const;
+      } catch (err) {
+        // Every model in the fallback chain failed for this one question --
+        // leave it blank rather than failing the whole pass.
+        console.error(
+          `recruitment-enrich: question "${String(key)}" (${params.kind}) failed on every fallback model`,
+          err instanceof Error ? err.message : err
+        );
+        return [key, null] as const;
+      }
+    })
+  );
+
+  const content = Object.fromEntries(answers) as Record<K, string | null>;
+  await supabase.from("recruitment_ai_insights").update({ status: "ready", content, error: null }).eq("id", id);
+  return "ran";
 }
 
 async function runCompanyOverviewPass(
   supabase: ReturnType<typeof createAdminClient>,
   details: DriveDetails
 ): Promise<PassOutcome> {
-  const { id, skip } = await ensurePendingInsight(supabase, {
+  return runResearchPass(supabase, {
     activityId: details.activity_id,
     userId: details.user_id,
     roundId: null,
     kind: "company_overview",
+    questions: COMPANY_OVERVIEW_QUESTIONS.map((q) => ({
+      key: q.key,
+      maxWords: q.maxWords,
+      userPrompt: q.question(details, ""),
+    })),
   });
-  if (skip) return "skipped";
-
-  const messages: GroqChatMessage[] = [
-    {
-      role: "system",
-      content:
-        "You are a research assistant helping a job candidate prep for an interview. " +
-        "Respond with ONLY strict JSON, no markdown fences, no commentary, matching this " +
-        'type: { "summary": string, "highlights": string[] }. `summary` is 2-4 sentences ' +
-        "on what the company does, its size/stage, and anything recent worth knowing. " +
-        "`highlights` is 3-5 short facts useful the day before an interview (funding, " +
-        "culture, notable products, interview reputation). If you can't find much, say " +
-        "so plainly in `summary` rather than inventing specifics.",
-    },
-    {
-      role: "user",
-      content: details.company_url
-        ? `Company: ${details.company_name} (${details.company_url})`
-        : `Company: ${details.company_name}`,
-    },
-  ];
-
-  try {
-    const raw = await callGroq(messages, true);
-    const content = parseModelJson<CompanyOverviewContent>(raw);
-    await supabase
-      .from("recruitment_ai_insights")
-      .update({ status: "ready", content, error: null })
-      .eq("id", id);
-  } catch (err) {
-    const message =
-      err instanceof GroqApiError || err instanceof Error ? err.message : "AI request failed";
-    await supabase.from("recruitment_ai_insights").update({ status: "failed", error: message }).eq("id", id);
-  }
-  return "ran";
 }
 
 async function runRoundPrepPass(
@@ -200,45 +260,16 @@ async function runRoundPrepPass(
   details: DriveDetails,
   round: { id: string; round_type: string }
 ): Promise<PassOutcome> {
-  const { id, skip } = await ensurePendingInsight(supabase, {
+  const roundLabel = ROUND_TYPE_LABELS[round.round_type as keyof typeof ROUND_TYPE_LABELS] ?? round.round_type;
+  return runResearchPass(supabase, {
     activityId: details.activity_id,
     userId: details.user_id,
     roundId: round.id,
     kind: "round_prep",
+    questions: ROUND_PREP_QUESTIONS.map((q) => ({
+      key: q.key,
+      maxWords: q.maxWords,
+      userPrompt: q.question(details, roundLabel),
+    })),
   });
-  if (skip) return "skipped";
-
-  const roundLabel = ROUND_TYPE_LABELS[round.round_type as keyof typeof ROUND_TYPE_LABELS] ?? round.round_type;
-
-  const messages: GroqChatMessage[] = [
-    {
-      role: "system",
-      content:
-        "You are a research assistant helping a job candidate prep for one specific " +
-        "interview round. Respond with ONLY strict JSON, no markdown fences, no " +
-        'commentary, matching this type: { "topics": string[], "duration": string, ' +
-        '"format": string, "questionCount": string }. Base this on publicly known ' +
-        "interview experiences for this company/role/round combination where you have " +
-        "them; otherwise give a reasonable general expectation for that round type and " +
-        "say it's a general estimate rather than inventing false specifics.",
-    },
-    {
-      role: "user",
-      content: `Company: ${details.company_name}\nRole: ${details.role}\nRound type: ${roundLabel}`,
-    },
-  ];
-
-  try {
-    const raw = await callGroq(messages, true);
-    const content = parseModelJson<RoundPrepContent>(raw);
-    await supabase
-      .from("recruitment_ai_insights")
-      .update({ status: "ready", content, error: null })
-      .eq("id", id);
-  } catch (err) {
-    const message =
-      err instanceof GroqApiError || err instanceof Error ? err.message : "AI request failed";
-    await supabase.from("recruitment_ai_insights").update({ status: "failed", error: message }).eq("id", id);
-  }
-  return "ran";
 }

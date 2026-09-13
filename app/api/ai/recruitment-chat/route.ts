@@ -7,9 +7,14 @@
 // fire-and-forget enrich route needs.
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { callGroq, GroqApiError, type GroqChatMessage } from "@/lib/ai/groq";
+import { callGroq, GroqApiError, GROQ_CHAT_MODEL, type GroqChatMessage } from "@/lib/ai/groq";
 import { currentRound, isSelfAssessment, RESULT_LABELS, ROUND_TYPE_LABELS } from "@/lib/recruitment";
-import type { CompanyOverviewContent, RoundPrepContent } from "@/app/api/ai/recruitment-enrich/route";
+import {
+  COMPANY_OVERVIEW_FIELDS,
+  ROUND_PREP_FIELDS,
+  type CompanyOverviewContent,
+  type RoundPrepContent,
+} from "@/lib/ai/recruitment-research";
 import type {
   RecruitmentAiInsight,
   RecruitmentChatMessage,
@@ -92,17 +97,15 @@ export async function POST(request: Request) {
     { role: "user", content: message },
   ];
 
-  // `withSearch: true` — chat now has the same `browser_search` tool the
-  // research passes use (plan 1.6.B explicitly reserved this as a flip-able
-  // option: "if a later task decides the chat should also be able to
-  // search, just add tools: [{"type": "browser_search"}] to its call").
-  // Passing the tool doesn't force a search on every turn — the model only
-  // invokes it when it decides the grounded context below isn't enough
-  // (e.g. the user explicitly asks it to look something up, or asks about
-  // something more current than what the research passes captured).
+  // H5: chat now runs on groq/compound (GROQ_CHAT_MODEL) instead of a plain
+  // model with a manually-attached browser_search tool. Compound has
+  // real-time web search built in server-side and decides on its own when
+  // to reach for it — no `tools` param to pass, and no daily token cap to
+  // worry about (see lib/ai/groq.ts). It still grounds in the context below
+  // first; it just also has a real way to go look something up when asked.
   let reply: string;
   try {
-    reply = await callGroq(messages, true);
+    reply = await callGroq(messages, GROQ_CHAT_MODEL);
   } catch (err) {
     const errorMessage =
       err instanceof GroqApiError || err instanceof Error ? err.message : "AI request failed";
@@ -135,12 +138,14 @@ function buildSystemMessage(
 ): string {
   const lines: string[] = [
     "You are an interview-prep assistant helping the candidate get ready for this " +
-      "recruitment drive. Ground your answers in the context below first. You also " +
-      "have a browser_search tool available — use it when the context below doesn't " +
-      "cover what's being asked (e.g. the user asks you to look something up, or " +
-      "wants something more current than what's in the research below), rather than " +
-      "guessing or inventing specifics. Don't feel obligated to search for every " +
-      "message — plain prep conversation grounded in the context below doesn't need it.",
+      "recruitment drive. Ground your answers in the context below first — it's " +
+      "already-researched, so treat it as reliable rather than re-verifying it. You " +
+      "also have real-time web search available and can use it on your own judgment " +
+      "when the context below doesn't cover what's being asked (e.g. the user asks " +
+      "you to look something up, or wants something more current than what's in the " +
+      "research below), rather than guessing or inventing specifics. Don't feel " +
+      "obligated to search for every message — plain prep conversation grounded in " +
+      "the context below doesn't need it.",
     "",
     `Company: ${details.company_name}${details.company_url ? ` (${details.company_url})` : ""}`,
     `Role: ${details.role}`,
@@ -156,13 +161,19 @@ function buildSystemMessage(
     );
   }
 
+  // H5: content is now a set of independently-nullable question answers
+  // (see COMPANY_OVERVIEW_FIELDS / ROUND_PREP_FIELDS in the enrich route)
+  // rather than one fixed summary/highlights blob — some fields may be
+  // blank because every fallback model failed to answer that one question,
+  // which is expected and not itself worth flagging to the model.
   lines.push("");
   const overviewContent = overview?.content as CompanyOverviewContent | undefined;
   if (overviewContent) {
     lines.push(
       "Company overview:",
-      overviewContent.summary,
-      ...overviewContent.highlights.map((h) => `- ${h}`)
+      ...COMPANY_OVERVIEW_FIELDS.map(
+        ({ key, label }) => `- ${label}: ${overviewContent[key] ?? "(not found)"}`
+      )
     );
   } else {
     lines.push("Company overview: not researched yet.");
@@ -173,11 +184,9 @@ function buildSystemMessage(
   if (roundPrepContent) {
     lines.push(
       "Round prep for the current round:",
-      `Format: ${roundPrepContent.format}`,
-      `Duration: ${roundPrepContent.duration}`,
-      `Question count: ${roundPrepContent.questionCount}`,
-      "Topics:",
-      ...roundPrepContent.topics.map((t) => `- ${t}`)
+      ...ROUND_PREP_FIELDS.map(
+        ({ key, label }) => `- ${label}: ${roundPrepContent[key] ?? "(not found)"}`
+      )
     );
   } else {
     lines.push("Round prep for the current round: not researched yet.");

@@ -14,8 +14,42 @@ import type {
   RecruitmentDetails,
   RecruitmentRound,
 } from "@/lib/types";
-import type { CompanyOverviewContent, RoundPrepContent } from "@/app/api/ai/recruitment-enrich/route";
+import {
+  COMPANY_OVERVIEW_FIELDS,
+  ROUND_PREP_FIELDS,
+  type CompanyOverviewContent,
+  type RoundPrepContent,
+} from "@/lib/ai/recruitment-research";
 import { cn } from "@/lib/utils";
+
+/**
+ * H5: renders a research pass's content as "label: answer" rows, driven by
+ * the field metadata the enrich route exports (COMPANY_OVERVIEW_FIELDS /
+ * ROUND_PREP_FIELDS) so the field list only has to be defined once, there.
+ * A null answer (every fallback model failed that one question — an
+ * expected, non-error outcome) renders as a muted "Not found" rather than
+ * being hidden, so it's visible that this question was attempted.
+ */
+function InsightFieldList<K extends string>({
+  fields,
+  content,
+}: {
+  fields: { key: K; label: string }[];
+  content: Record<K, string | null>;
+}) {
+  return (
+    <dl className="space-y-2 text-sm">
+      {fields.map(({ key, label }) => (
+        <div key={key}>
+          <dt className="text-ink-soft">{label}</dt>
+          <dd className={content[key] ? "text-ink" : "italic text-ink-soft/70"}>
+            {content[key] ?? "Not found"}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 /** Read-only line for any round that isn't the current one (see 1.4 — every
  * earlier round is, by construction, already resolved to get here). */
@@ -153,16 +187,7 @@ export default async function RecruitmentDetailPage({
           status={companyOverview?.status ?? "missing"}
           error={companyOverview?.error}
         >
-          {overviewContent && (
-            <div className="text-sm text-ink">
-              <p>{overviewContent.summary}</p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-ink-soft">
-                {overviewContent.highlights.map((h, i) => (
-                  <li key={i}>{h}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {overviewContent && <InsightFieldList fields={COMPANY_OVERVIEW_FIELDS} content={overviewContent} />}
         </RecruitmentInsightSection>
 
         {current && (
@@ -173,19 +198,7 @@ export default async function RecruitmentDetailPage({
             status={roundPrep?.status ?? "missing"}
             error={roundPrep?.error}
           >
-            {roundPrepContent && (
-              <div className="text-sm text-ink">
-                <p className="text-ink-soft">
-                  {roundPrepContent.format} &middot; {roundPrepContent.duration} &middot;{" "}
-                  {roundPrepContent.questionCount}
-                </p>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-ink-soft">
-                  {roundPrepContent.topics.map((t, i) => (
-                    <li key={i}>{t}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {roundPrepContent && <InsightFieldList fields={ROUND_PREP_FIELDS} content={roundPrepContent} />}
           </RecruitmentInsightSection>
         )}
 
