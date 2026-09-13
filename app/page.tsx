@@ -237,6 +237,12 @@ export default async function DashboardPage() {
             <div className="mb-1 flex items-center gap-3">
               <h2 className="shrink-0 text-xs text-ink-soft">Recruitment ({activeDrives.length})</h2>
               <div className="h-px flex-1 bg-line" />
+              <Link
+                href="/activities/recruitment"
+                className="shrink-0 text-xs text-ink-soft hover:text-ink hover:underline underline-offset-2"
+              >
+                View full history
+              </Link>
             </div>
             <ul>
               {activeDrives.map(({ activity, details, round }) => (
