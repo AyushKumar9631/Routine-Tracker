@@ -179,6 +179,20 @@ export interface RecruitmentChatMessage {
   created_at: string;
 }
 
+/**
+ * Shape of the recruitment creation form — deliberately separate from
+ * ActivityFormInput (recruitment activities skip period/completion_type
+ * entirely) and from RecruitmentDetails/RecruitmentRound (those are DB row
+ * shapes; this is just what round 1 needs at creation time).
+ */
+export interface RecruitmentFormInput {
+  company_name: string;
+  company_url: string;
+  role: string;
+  round_type: RoundType;
+  test_date: string; // "" = not set yet; else "YYYY-MM-DD" from <input type="date">
+}
+
 export const DAY_NAMES = [
   "Sunday",
   "Monday",

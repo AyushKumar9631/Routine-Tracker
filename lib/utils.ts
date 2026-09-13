@@ -193,6 +193,17 @@ export function defaultActivityForm(): import("@/lib/types").ActivityFormInput {
   };
 }
 
+/** Defaults for the recruitment-drive creation form — see RecruitmentFormInput. */
+export function defaultRecruitmentForm(): import("@/lib/types").RecruitmentFormInput {
+  return {
+    company_name: "",
+    company_url: "",
+    role: "",
+    round_type: "oa",
+    test_date: "",
+  };
+}
+
 export const LEETCODE_ICON_URL = "https://assets.leetcode.com/users/leetcode/avatar_1568224780.png";
 export const GFG_ICON_URL = "https://media.geeksforgeeks.org/gfg-gg-logo.svg";
 export const SCREENTIME_ICON_URL =
