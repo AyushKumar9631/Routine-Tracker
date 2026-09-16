@@ -164,7 +164,8 @@ export interface RecruitmentAiInsight {
   user_id: string;
   kind: InsightKind;
   status: InsightStatus;
-  content: unknown | null; // shape depends on `kind`; parsed JSON from the model
+  content: unknown | null; // shape depends on `kind`; see lib/ai/recruitment-research.ts
+  progress: unknown | null; // H7 stepper state; see RowProgress in lib/ai/recruitment-research.ts
   error: string | null;
   created_at: string;
   updated_at: string;

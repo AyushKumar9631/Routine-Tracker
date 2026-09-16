@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Nav } from "@/components/nav";
 import { ActivityIcon } from "@/components/activity-icon";
 import { RecruitmentRow } from "@/components/recruitment-row";
-import { RecruitmentInsightSection } from "@/components/recruitment-insight-section";
+import { RecruitmentResearchPanel, type SectionSnapshot } from "@/components/recruitment-research-panel";
 import { RecruitmentChat } from "@/components/recruitment-chat";
 import { currentRound, RESULT_LABELS, ROUND_TYPE_LABELS, sortRounds } from "@/lib/recruitment";
 import type {
@@ -14,41 +14,21 @@ import type {
   RecruitmentDetails,
   RecruitmentRound,
 } from "@/lib/types";
-import {
-  COMPANY_OVERVIEW_FIELDS,
-  ROUND_PREP_FIELDS,
-  type CompanyOverviewContent,
-  type RoundPrepContent,
-} from "@/lib/ai/recruitment-research";
+import type { QuestionRecord, RowProgress } from "@/lib/ai/recruitment-research";
 import { cn } from "@/lib/utils";
 
-/**
- * H5: renders a research pass's content as "label: answer" rows, driven by
- * the field metadata the enrich route exports (COMPANY_OVERVIEW_FIELDS /
- * ROUND_PREP_FIELDS) so the field list only has to be defined once, there.
- * A null answer (every fallback model failed that one question — an
- * expected, non-error outcome) renders as a muted "Not found" rather than
- * being hidden, so it's visible that this question was attempted.
- */
-function InsightFieldList<K extends string>({
-  fields,
-  content,
-}: {
-  fields: { key: K; label: string }[];
-  content: Record<K, string | null>;
-}) {
-  return (
-    <dl className="space-y-2 text-sm">
-      {fields.map(({ key, label }) => (
-        <div key={key}>
-          <dt className="text-ink-soft">{label}</dt>
-          <dd className={content[key] ? "text-ink" : "italic text-ink-soft/70"}>
-            {content[key] ?? "Not found"}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
+/** Turns a fetched recruitment_ai_insights row into the snapshot shape the
+ * H7 client stepper (RecruitmentResearchPanel) needs to know where to pick
+ * up from. `undefined` (no row at all yet) maps to `insightId: null,
+ * content: null` — the panel's "missing" phase. */
+function toSnapshot(insight: RecruitmentAiInsight | undefined): SectionSnapshot {
+  const progress = (insight?.progress ?? null) as RowProgress | null;
+  return {
+    insightId: insight?.id ?? null,
+    content: (insight?.content as Record<string, QuestionRecord> | null) ?? null,
+    status: insight?.status ?? "pending",
+    haltReason: progress?.haltReason ?? null,
+  };
 }
 
 /** Read-only line for any round that isn't the current one (see 1.4 — every
@@ -116,8 +96,6 @@ export default async function RecruitmentDetailPage({
   const roundPrep = current
     ? insights.find((i) => i.kind === "round_prep" && i.round_id === current.id)
     : undefined;
-  const overviewContent = companyOverview?.content as CompanyOverviewContent | undefined;
-  const roundPrepContent = roundPrep?.content as RoundPrepContent | undefined;
 
   const { data: chatMessagesData } = await supabase
     .from("recruitment_chat_messages")
@@ -180,27 +158,12 @@ export default async function RecruitmentDetailPage({
           </ul>
         </section>
 
-        <RecruitmentInsightSection
-          title="Company overview"
+        <RecruitmentResearchPanel
           activityId={activity.id}
           roundId={current?.id}
-          status={companyOverview?.status ?? "missing"}
-          error={companyOverview?.error}
-        >
-          {overviewContent && <InsightFieldList fields={COMPANY_OVERVIEW_FIELDS} content={overviewContent} />}
-        </RecruitmentInsightSection>
-
-        {current && (
-          <RecruitmentInsightSection
-            title="Round prep"
-            activityId={activity.id}
-            roundId={current.id}
-            status={roundPrep?.status ?? "missing"}
-            error={roundPrep?.error}
-          >
-            {roundPrepContent && <InsightFieldList fields={ROUND_PREP_FIELDS} content={roundPrepContent} />}
-          </RecruitmentInsightSection>
-        )}
+          companyOverview={toSnapshot(companyOverview)}
+          roundPrep={current ? toSnapshot(roundPrep) : null}
+        />
 
         <section>
           <h2 className="mb-3 text-sm text-ink-soft">Chat</h2>

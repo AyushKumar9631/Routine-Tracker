@@ -13,6 +13,7 @@ import {
   COMPANY_OVERVIEW_FIELDS,
   ROUND_PREP_FIELDS,
   type CompanyOverviewContent,
+  type QuestionRecord,
   type RoundPrepContent,
 } from "@/lib/ai/recruitment-research";
 import type {
@@ -161,19 +162,18 @@ function buildSystemMessage(
     );
   }
 
-  // H5: content is now a set of independently-nullable question answers
-  // (see COMPANY_OVERVIEW_FIELDS / ROUND_PREP_FIELDS in the enrich route)
-  // rather than one fixed summary/highlights blob — some fields may be
-  // blank because every fallback model failed to answer that one question,
-  // which is expected and not itself worth flagging to the model.
+  // H7: content now tracks a real state per question (resolved / unknown /
+  // skipped / unattempted), not just a nullable string — but this route
+  // only ever reads rows with status === "ready" (see the query above),
+  // which by construction means every question is either "resolved" or a
+  // confirmed "unknown". describeAnswer handles the other two states
+  // defensively rather than assuming that invariant always holds.
   lines.push("");
   const overviewContent = overview?.content as CompanyOverviewContent | undefined;
   if (overviewContent) {
     lines.push(
       "Company overview:",
-      ...COMPANY_OVERVIEW_FIELDS.map(
-        ({ key, label }) => `- ${label}: ${overviewContent[key] ?? "(not found)"}`
-      )
+      ...COMPANY_OVERVIEW_FIELDS.map(({ key, label }) => `- ${label}: ${describeAnswer(overviewContent[key])}`)
     );
   } else {
     lines.push("Company overview: not researched yet.");
@@ -184,13 +184,16 @@ function buildSystemMessage(
   if (roundPrepContent) {
     lines.push(
       "Round prep for the current round:",
-      ...ROUND_PREP_FIELDS.map(
-        ({ key, label }) => `- ${label}: ${roundPrepContent[key] ?? "(not found)"}`
-      )
+      ...ROUND_PREP_FIELDS.map(({ key, label }) => `- ${label}: ${describeAnswer(roundPrepContent[key])}`)
     );
   } else {
     lines.push("Round prep for the current round: not researched yet.");
   }
 
   return lines.join("\n");
+}
+
+function describeAnswer(record: QuestionRecord | undefined): string {
+  if (record?.state === "resolved" && record.answer) return record.answer;
+  return "(not found)";
 }

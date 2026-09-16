@@ -1,0 +1,30 @@
+-- Adds per-row sequential-stepping progress for the recruitment AI research
+-- passes (plan H7). Each pass (company overview / round prep) now answers
+-- its 5 questions one at a time, via repeated short client-driven calls to
+-- app/api/ai/recruitment-enrich/step, instead of one big concurrent batch.
+--
+-- `progress` tracks where that stepping is up to for THIS row:
+--   { currentQuestionKey, currentModelIndex, questionStartedAt, haltReason }
+-- NULL means "no run in progress" -- either nothing has started yet, or the
+-- last run finished cleanly (reset to null once a question resolves).
+-- `haltReason: "exhausted"` (inside the jsonb, not a new top-level column)
+-- marks a row that stopped because every model in the fallback chain hit a
+-- clear rate/token limit on some question -- deliberately NOT modeled as a
+-- new `status` value, so the existing `status` CHECK constraint
+-- (pending/ready/failed) doesn't need to change; the frontend distinguishes
+-- "actively stepping" from "paused, needs a manual resume" by reading
+-- progress->>'haltReason', not status, while status stays 'pending' either
+-- way.
+--
+-- `content`'s shape also changed at the application layer (H7): each
+-- question is now { answer: string | null; state: "unattempted" |
+-- "resolved" | "unknown" | "skipped" } instead of a bare string | null, so
+-- the stepper can tell "genuinely not yet attempted" apart from "the model
+-- said it doesn't know" apart from "we gave up on this one for now, retry
+-- later" -- and only the first and last of those get retried by a fresh
+-- Start research/Retry. No migration needed for that part: content was
+-- already jsonb with no shape enforced in SQL (see 014's own notes) --
+-- rows written in the older shape just render everything as "not yet
+-- resolved" until they're regenerated.
+alter table recruitment_ai_insights
+  add column if not exists progress jsonb;
