@@ -309,7 +309,8 @@ function SectionView({ kind, state, onStart }: { kind: Kind; state: SectionRunti
 }
 
 /**
- * Renders a research pass's content as "label: answer" rows. A question in
+ * Renders a research pass's content as labeled rows, each visually
+ * separated (H8 — the flat run-together list read poorly). A question in
  * state "unknown" (the model was asked and said it genuinely doesn't know)
  * renders as a muted "Not found" — distinct from "skipped"/"unattempted",
  * which shouldn't normally still be showing once phase is "ready" (that
@@ -323,17 +324,44 @@ function InsightFieldList({
   content: Record<string, QuestionRecord>;
 }) {
   return (
-    <dl className="space-y-2 text-sm">
+    <dl>
       {fields.map(({ key, label }) => {
         const record = content[key];
         const answer = record?.state === "resolved" ? record.answer : null;
         return (
-          <div key={key}>
-            <dt className="text-ink-soft">{label}</dt>
-            <dd className={answer ? "text-ink" : "italic text-ink-soft/70"}>{answer ?? "Not found"}</dd>
+          <div key={key} className="border-b border-line py-3 last:border-b-0">
+            <dt className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">{label}</dt>
+            <dd className={answer ? "text-sm text-ink" : "text-sm italic text-ink-soft/70"}>
+              {answer ? <AnswerBody text={answer} /> : "Not found"}
+            </dd>
           </div>
         );
       })}
     </dl>
+  );
+}
+
+/**
+ * H8: a research answer is plain prose by default, but researchSystemPrompt
+ * now allows the model to write a short bullet per line (each starting
+ * with "- ") when the content is naturally a list — this renders those as
+ * an actual <ul> instead of a run-on line. Anything that isn't every line
+ * bullet-prefixed renders as ordinary prose, unchanged.
+ */
+function AnswerBody({ text }: { text: string }) {
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const isBulletList = lines.length > 1 && lines.every((line) => /^[-*]\s+/.test(line));
+
+  if (!isBulletList) return <p className="leading-relaxed">{text}</p>;
+
+  return (
+    <ul className="list-disc space-y-1 pl-4 leading-relaxed">
+      {lines.map((line, i) => (
+        <li key={i}>{line.replace(/^[-*]\s+/, "")}</li>
+      ))}
+    </ul>
   );
 }

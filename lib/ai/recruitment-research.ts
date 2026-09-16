@@ -254,29 +254,59 @@ export function isUnknownAnswer(text: string): boolean {
   return /^unknown\.?$/i.test(text.trim());
 }
 
+/**
+ * H8: Groq's browser_search tool sometimes appends citation markers like
+ * "【2†L55-L62】" directly onto the model's answer text (immediately after a
+ * word, no space) — meaningless inline noise here, since there's no way for
+ * this UI to resolve them to an actual source. Stripped as defense-in-depth
+ * before word-counting/truncation runs, same "prompt asks nicely, code
+ * guarantees it" philosophy as the word cap below — researchSystemPrompt
+ * also tells the model not to include these, but that's a request, not a
+ * guarantee, exactly like the word limit itself.
+ */
+function stripCitationArtifacts(text: string): string {
+  return text
+    .replace(/\u3010[^\u3011]*\u3011/g, "") // the 【...】 bracket pair specifically
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 /** Belt-and-suspenders word cap -- the prompt already asks for this, this
- * guarantees it regardless of whether a given model actually complied. */
+ * guarantees it regardless of whether a given model actually complied.
+ * Only reflows onto one line (losing bullet formatting) when truncation
+ * actually has to kick in -- the common case, where the model stayed under
+ * the limit, returns the text untouched (newlines and all), which is what
+ * lets a multi-line bullet answer render as an actual list on the detail
+ * page instead of getting flattened into one run-on line. */
 export function truncateWords(text: string, maxWords: number): string {
-  const words = text.trim().split(/\s+/);
-  if (words.length <= maxWords) return text.trim();
+  const trimmed = text.trim();
+  const words = trimmed.split(/\s+/);
+  if (words.length <= maxWords) return trimmed;
   return words.slice(0, maxWords).join(" ") + "\u2026";
 }
 
 /** Turns a raw model reply into the answer half of a QuestionRecord — null
  * (meaning "state: unknown") if the model said so or replied with nothing
- * usable, otherwise the word-capped text. */
+ * usable, otherwise the cleaned, word-capped text. */
 export function normalizeAnswer(raw: string, maxWords: number): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed || isUnknownAnswer(trimmed)) return null;
-  return truncateWords(trimmed, maxWords);
+  const cleaned = stripCitationArtifacts(raw);
+  if (!cleaned || isUnknownAnswer(cleaned)) return null;
+  return truncateWords(cleaned, maxWords);
 }
 
 export function researchSystemPrompt(maxWords: number): string {
   return (
     "You are a research assistant helping a job candidate prep for an interview. " +
-    "Answer ONLY the question in the next message, in plain prose, no markdown, no " +
-    `preamble, no restating the question. Maximum ${maxWords} words. If you don't have ` +
-    'reliable information to answer, respond with exactly the single word "UNKNOWN" ' +
-    "and nothing else -- never invent specifics."
+    "Answer ONLY the question in the next message. Keep the answer clean and simple: " +
+    'plain prose by default. If the answer is naturally a short list of distinct ' +
+    'items (e.g. several topics, or a few tips), you may instead write one short ' +
+    'point per line, each line starting with "- ", instead of prose -- but use no ' +
+    "other formatting (no headers, no bold, no numbered lists). Either way, never " +
+    'include citation markers, footnotes, or bracketed source references of any ' +
+    'kind (for example "\u30101\u2020L12-L14\u3011") in the answer text itself -- write ' +
+    "the answer as if there were no sources to cite, even though you did look them " +
+    `up. Maximum ${maxWords} words total. If you don't have reliable information to ` +
+    'answer, respond with exactly the single word "UNKNOWN" and nothing else -- ' +
+    "never invent specifics."
   );
 }

@@ -24,20 +24,16 @@ export const GROQ_CHAT_MODEL = "groq/compound";
 // shared/pooled — see plan doc H5) so a 429 on one doesn't mean the next is
 // exhausted too.
 //
-// Only the first three actually support the `browser_search` built-in tool
-// (console.groq.com/docs/browser-search, checked 2026-09-13) — the Qwen
-// models don't have any web-search tool on Groq at all. `callGroq` below
-// silently drops the tool for models that don't support it rather than
-// sending a request Groq would reject, so a call that falls through to
-// Qwen still returns a best-effort answer from the model's own training
-// data — better than an empty field, just not live-researched.
-export const GROQ_RESEARCH_MODELS = [
-  "openai/gpt-oss-120b",
-  "openai/gpt-oss-20b",
-  "openai/gpt-oss-safeguard-20b",
-  "qwen/qwen3.6-27b",
-  "qwen/qwen3.8-27b",
-] as const;
+// H8: this used to also include qwen/qwen3.6-27b and qwen/qwen3.8-27b as a
+// last-resort tier, but neither has ever supported Groq's `browser_search`
+// tool (console.groq.com/docs/browser-search, checked 2026-09-13) — a call
+// that fell through to them was answering from training data only, not
+// actually researching anything, which defeats the point of this feature.
+// Every model below supports browser_search, so BROWSER_SEARCH_MODELS is
+// now just this same list — kept as an explicit set rather than assumed,
+// so a future model added here without search support fails loudly (via
+// callGroq silently dropping the tool for it) rather than silently.
+export const GROQ_RESEARCH_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "openai/gpt-oss-safeguard-20b"] as const;
 
 const BROWSER_SEARCH_MODELS = new Set<string>([
   "openai/gpt-oss-120b",
