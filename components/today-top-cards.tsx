@@ -50,7 +50,15 @@ export function TodayTopCards({ items }: { items: { id: string; node: React.Reac
       >
         <div
           className="flex transition-transform duration-300 ease-out"
-          style={{ transform: `translateX(-${clamped * 100}%)`, width: `${items.length * 100}%` }}
+          style={{
+            // `%` in a CSS transform is relative to the element's OWN width —
+            // and this track is items.length*100% wide, not one slide's
+            // width — so shifting by one slide is (100/items.length)% per
+            // step, not a flat 100%. Getting this wrong scrolls every slide
+            // past index 0 fully out of view (looks like a blank card).
+            transform: `translateX(-${(clamped * 100) / items.length}%)`,
+            width: `${items.length * 100}%`,
+          }}
         >
           {items.map((item) => (
             <div key={item.id} className="shrink-0" style={{ width: `${100 / items.length}%` }}>
