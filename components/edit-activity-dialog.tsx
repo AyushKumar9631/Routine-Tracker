@@ -7,6 +7,7 @@ import { updateActivity, deleteActivity } from "@/actions/activities";
 import { getLeetcodeConfig } from "@/actions/leetcode";
 import { getGfgConfig } from "@/actions/gfg";
 import { getScreentimeConfig } from "@/actions/screentime";
+import { getStudyTimerConfig } from "@/actions/study-timer";
 import type { Activity, ActivityFormInput } from "@/lib/types";
 
 function toFormInput(
@@ -18,12 +19,15 @@ function toFormInput(
   notificationTemplate: string | null = null,
   screentimeNotify90: string | null = null,
   screentimeNotify110: string | null = null,
-  screentimeNotify150: string | null = null
+  screentimeNotify150: string | null = null,
+  studyNotifyOnGoal = true,
+  studyNotificationTemplate: string | null = null
 ): ActivityFormInput {
   const automation_type =
     activity.automation_type === "leetcode_potd" ||
     activity.automation_type === "gfg_potd" ||
-    activity.automation_type === "screen_time"
+    activity.automation_type === "screen_time" ||
+    activity.automation_type === "study_timer"
       ? activity.automation_type
       : "none";
   return {
@@ -47,6 +51,8 @@ function toFormInput(
     screentime_notify_90_template: screentimeNotify90,
     screentime_notify_110_template: screentimeNotify110,
     screentime_notify_150_template: screentimeNotify150,
+    study_notify_on_goal: studyNotifyOnGoal,
+    study_notification_template: studyNotificationTemplate,
   };
 }
 
@@ -98,6 +104,24 @@ export function EditActivityDialog({ activity }: { activity: Activity }) {
             config?.notify_90_template ?? null,
             config?.notify_110_template ?? null,
             config?.notify_150_template ?? null
+          )
+        )
+      );
+    } else if (activity.automation_type === "study_timer") {
+      getStudyTimerConfig(activity.id).then((config) =>
+        setValue(
+          toFormInput(
+            activity,
+            "",
+            "",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            config?.notify_on_goal ?? true,
+            config?.notification_template ?? null
           )
         )
       );

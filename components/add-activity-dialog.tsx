@@ -37,6 +37,13 @@ const TEMPLATES: { type: AutomationType; icon: string; title: string; descriptio
     title: "Screen Time",
     description: "Synced daily from your iPhone via a Shortcut. Stay under your budget.",
   },
+  {
+    type: "study_timer",
+    icon: "\u23f1\ufe0f",
+    title: "Study Timer",
+    description:
+      "Set a daily study goal and run a live countdown while you study \u2014 overtime keeps counting.",
+  },
 ];
 
 // Not an automation template — a recruitment drive is a different `kind` of

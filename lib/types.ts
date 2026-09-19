@@ -81,6 +81,18 @@ export interface ScreentimeConfig {
   updated_at: string;
 }
 
+export interface StudyTimerConfig {
+  id: string;
+  activity_id: string;
+  user_id: string;
+  running_since: string | null; // set while a session is live; null when stopped
+  session_period_key: string | null; // day the current session's minutes should add to
+  notify_on_goal: boolean;
+  notification_template: string | null; // custom phone-push message; null = use the default
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Completion {
   id: string;
   activity_id: string;
@@ -106,7 +118,7 @@ export interface ActivityFormInput {
   target_value: number | null;
   unit_label: string;
 
-  automation_type: "none" | "leetcode_potd" | "gfg_potd" | "screen_time";
+  automation_type: "none" | "leetcode_potd" | "gfg_potd" | "screen_time" | "study_timer";
   leetcode_username: string;
   preferred_complete_by: string | null; // "HH:MM" from a <input type="time">, LeetCode + GFG
   notification_template: string | null; // LeetCode + GFG; null = use the default
@@ -115,6 +127,9 @@ export interface ActivityFormInput {
   screentime_notify_90_template: string | null; // null = use the default
   screentime_notify_110_template: string | null;
   screentime_notify_150_template: string | null;
+
+  study_notify_on_goal: boolean; // Study Timer: sound + browser + phone notification when the goal is hit
+  study_notification_template: string | null; // Study Timer phone push; null = use the default
 }
 
 // --- Recruitment Tracker ---

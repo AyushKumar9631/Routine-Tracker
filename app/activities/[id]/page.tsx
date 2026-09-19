@@ -7,11 +7,20 @@ import { ActivityIcon } from "@/components/activity-icon";
 import { LeetcodeSyncButton } from "@/components/leetcode-sync-button";
 import { GfgSyncButton } from "@/components/gfg-sync-button";
 import { ScreentimeWebhookCard } from "@/components/screentime-webhook-card";
+import { StudyTimerCard } from "@/components/study-timer-card";
 import { StatPill } from "@/components/stat-pill";
 import { CompletionHeatmap } from "@/components/completion-heatmap";
 import { EmptyState } from "@/components/empty-state";
-import type { Activity, Completion, LeetCodeConfig, GfgConfig, ScreentimeConfig } from "@/lib/types";
+import type {
+  Activity,
+  Completion,
+  LeetCodeConfig,
+  GfgConfig,
+  ScreentimeConfig,
+  StudyTimerConfig,
+} from "@/lib/types";
 import { calcCompletionRate, calcStreak, formatDateKey, parseDateKey, scheduleLabel, todayKey } from "@/lib/utils";
+import { formatScreenTimeLong } from "@/lib/screentime";
 
 export default async function ActivityDetailPage({
   params,
@@ -67,6 +76,26 @@ export default async function ActivityDetailPage({
       .eq("activity_id", id)
       .maybeSingle();
     screentimeConfig = data as ScreentimeConfig | null;
+  }
+
+  let studyTimerConfig: StudyTimerConfig | null = null;
+  let studyTimerBaseMinutes = 0;
+  if (typedActivity.automation_type === "study_timer") {
+    const { data } = await supabase
+      .from("study_timer_config")
+      .select("*")
+      .eq("activity_id", id)
+      .maybeSingle();
+    studyTimerConfig = data as StudyTimerConfig | null;
+
+    const basePeriodKey = studyTimerConfig?.session_period_key ?? todayKey();
+    const { data: baseCompletion } = await supabase
+      .from("completions")
+      .select("value")
+      .eq("activity_id", id)
+      .eq("period_key", basePeriodKey)
+      .maybeSingle();
+    studyTimerBaseMinutes = (baseCompletion?.value as number | null) ?? 0;
   }
 
   const streak = calcStreak(typedActivity, completions);
@@ -126,6 +155,20 @@ export default async function ActivityDetailPage({
           </div>
         )}
 
+        {typedActivity.automation_type === "study_timer" && (
+          <div className="mb-10">
+            <StudyTimerCard
+              activityId={typedActivity.id}
+              activityName={typedActivity.name}
+              activityIcon={typedActivity.icon}
+              goalMinutes={typedActivity.target_value}
+              runningSince={studyTimerConfig?.running_since ?? null}
+              baseMinutes={studyTimerBaseMinutes}
+              notifyOnGoal={studyTimerConfig?.notify_on_goal ?? true}
+            />
+          </div>
+        )}
+
         <div className="mb-10 grid grid-cols-3 gap-3">
           <StatPill label="current streak" value={String(streak)} />
           <StatPill label="last 30 days" value={`${rate30}%`} />
@@ -146,31 +189,39 @@ export default async function ActivityDetailPage({
             />
           ) : (
             <ul>
-              {completions.slice(0, 14).map((c) => (
-                <li
-                  key={c.id}
-                  className="flex items-center justify-between border-b border-line py-3 text-sm last:border-b-0"
-                >
-                  <span className="font-mono text-ink-soft">
-                    {formatDateKey(parseDateKey(c.period_key)) === c.period_key
-                      ? new Date(c.period_key).toLocaleDateString(undefined, {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                        })
-                      : c.period_key}
-                  </span>
-                  <span className={c.completed ? "text-moss" : "text-rust"}>
-                    {typedActivity.completion_type === "count"
-                      ? `${c.value ?? 0}${
-                          typedActivity.target_value ? ` / ${typedActivity.target_value}` : ""
-                        }${typedActivity.unit_label ? ` ${typedActivity.unit_label}` : ""}`
-                      : c.completed
-                      ? "Done"
-                      : "Not done"}
-                  </span>
-                </li>
-              ))}
+              {completions
+                .slice(0, typedActivity.automation_type === "study_timer" ? 30 : 14)
+                .map((c) => (
+                  <li
+                    key={c.id}
+                    className="flex items-center justify-between border-b border-line py-3 text-sm last:border-b-0"
+                  >
+                    <span className="font-mono text-ink-soft">
+                      {formatDateKey(parseDateKey(c.period_key)) === c.period_key
+                        ? new Date(c.period_key).toLocaleDateString(undefined, {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                          })
+                        : c.period_key}
+                    </span>
+                    <span className={c.completed ? "text-moss" : "text-rust"}>
+                      {typedActivity.automation_type === "study_timer"
+                        ? `${formatScreenTimeLong(c.value)}${
+                            typedActivity.target_value
+                              ? ` / ${formatScreenTimeLong(typedActivity.target_value)}`
+                              : ""
+                          }`
+                        : typedActivity.completion_type === "count"
+                        ? `${c.value ?? 0}${
+                            typedActivity.target_value ? ` / ${typedActivity.target_value}` : ""
+                          }${typedActivity.unit_label ? ` ${typedActivity.unit_label}` : ""}`
+                        : c.completed
+                        ? "Done"
+                        : "Not done"}
+                    </span>
+                  </li>
+                ))}
             </ul>
           )}
         </section>

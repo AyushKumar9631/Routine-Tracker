@@ -15,13 +15,17 @@ export async function createActivity(input: ActivityFormInput) {
   const isLeetcode = input.automation_type === "leetcode_potd";
   const isGfg = input.automation_type === "gfg_potd";
   const isScreenTime = input.automation_type === "screen_time";
-  const isAutomated = isLeetcode || isGfg || isScreenTime;
+  const isStudyTimer = input.automation_type === "study_timer";
+  const isAutomated = isLeetcode || isGfg || isScreenTime || isStudyTimer;
 
   if (isScreenTime && input.screentime_platform === "android") {
     throw new Error("Android screen time automation isn't available yet");
   }
   if (isScreenTime && input.screentime_platform !== "ios") {
     throw new Error("Choose a phone to set up screen time tracking");
+  }
+  if (isStudyTimer && (!input.target_value || input.target_value <= 0)) {
+    throw new Error("Set a daily study goal, in minutes");
   }
 
   const { data: activity, error } = await supabase
@@ -40,17 +44,20 @@ export async function createActivity(input: ActivityFormInput) {
       schedule_day_of_month:
         !isAutomated && input.period === "monthly" ? input.schedule_day_of_month : null,
       anchor_date: !isAutomated && input.period === "biweekly" ? input.anchor_date : null,
-      completion_type: isScreenTime ? "count" : isAutomated ? "boolean" : input.completion_type,
-      target_value: isScreenTime
-        ? input.target_value
-        : !isAutomated && input.completion_type === "count"
-        ? input.target_value
-        : null,
-      unit_label: isScreenTime
-        ? "min"
-        : !isAutomated && input.completion_type === "count"
-        ? input.unit_label.trim() || null
-        : null,
+      completion_type:
+        isScreenTime || isStudyTimer ? "count" : isAutomated ? "boolean" : input.completion_type,
+      target_value:
+        isScreenTime || isStudyTimer
+          ? input.target_value
+          : !isAutomated && input.completion_type === "count"
+          ? input.target_value
+          : null,
+      unit_label:
+        isScreenTime || isStudyTimer
+          ? "min"
+          : !isAutomated && input.completion_type === "count"
+          ? input.unit_label.trim() || null
+          : null,
       is_automated: isAutomated,
       automation_type: isAutomated ? input.automation_type : null,
     })
@@ -93,6 +100,14 @@ export async function createActivity(input: ActivityFormInput) {
       notify_150_template: input.screentime_notify_150_template || null,
     });
     if (configError) throw new Error(configError.message);
+  } else if (isStudyTimer) {
+    const { error: configError } = await supabase.from("study_timer_config").insert({
+      activity_id: activity.id,
+      user_id: user.id,
+      notify_on_goal: input.study_notify_on_goal,
+      notification_template: input.study_notification_template || null,
+    });
+    if (configError) throw new Error(configError.message);
   }
 
   revalidatePath("/");
@@ -109,13 +124,17 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
   const isLeetcode = input.automation_type === "leetcode_potd";
   const isGfg = input.automation_type === "gfg_potd";
   const isScreenTime = input.automation_type === "screen_time";
-  const isAutomated = isLeetcode || isGfg || isScreenTime;
+  const isStudyTimer = input.automation_type === "study_timer";
+  const isAutomated = isLeetcode || isGfg || isScreenTime || isStudyTimer;
 
   if (isScreenTime && input.screentime_platform === "android") {
     throw new Error("Android screen time automation isn't available yet");
   }
   if (isScreenTime && input.screentime_platform !== "ios") {
     throw new Error("Choose a phone to set up screen time tracking");
+  }
+  if (isStudyTimer && (!input.target_value || input.target_value <= 0)) {
+    throw new Error("Set a daily study goal, in minutes");
   }
 
   const { error } = await supabase
@@ -133,17 +152,20 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
       schedule_day_of_month:
         !isAutomated && input.period === "monthly" ? input.schedule_day_of_month : null,
       anchor_date: !isAutomated && input.period === "biweekly" ? input.anchor_date : null,
-      completion_type: isScreenTime ? "count" : isAutomated ? "boolean" : input.completion_type,
-      target_value: isScreenTime
-        ? input.target_value
-        : !isAutomated && input.completion_type === "count"
-        ? input.target_value
-        : null,
-      unit_label: isScreenTime
-        ? "min"
-        : !isAutomated && input.completion_type === "count"
-        ? input.unit_label.trim() || null
-        : null,
+      completion_type:
+        isScreenTime || isStudyTimer ? "count" : isAutomated ? "boolean" : input.completion_type,
+      target_value:
+        isScreenTime || isStudyTimer
+          ? input.target_value
+          : !isAutomated && input.completion_type === "count"
+          ? input.target_value
+          : null,
+      unit_label:
+        isScreenTime || isStudyTimer
+          ? "min"
+          : !isAutomated && input.completion_type === "count"
+          ? input.unit_label.trim() || null
+          : null,
       is_automated: isAutomated,
       automation_type: isAutomated ? input.automation_type : null,
     })
@@ -170,6 +192,7 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
     if (configError) throw new Error(configError.message);
     await supabase.from("gfg_potd_config").delete().eq("activity_id", id);
     await supabase.from("screentime_config").delete().eq("activity_id", id);
+    await supabase.from("study_timer_config").delete().eq("activity_id", id);
   } else if (isGfg) {
     const username = input.gfg_username.trim();
     if (!username) throw new Error("GFG username is required");
@@ -188,6 +211,7 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
     if (configError) throw new Error(configError.message);
     await supabase.from("leetcode_potd_config").delete().eq("activity_id", id);
     await supabase.from("screentime_config").delete().eq("activity_id", id);
+    await supabase.from("study_timer_config").delete().eq("activity_id", id);
   } else if (isScreenTime) {
     // Preserve the existing token on edit — the webhook URL must stay
     // stable, or the user's already-built Shortcut silently breaks.
@@ -221,10 +245,29 @@ export async function updateActivity(id: string, input: ActivityFormInput) {
     }
     await supabase.from("leetcode_potd_config").delete().eq("activity_id", id);
     await supabase.from("gfg_potd_config").delete().eq("activity_id", id);
+    await supabase.from("study_timer_config").delete().eq("activity_id", id);
+  } else if (isStudyTimer) {
+    // No secret/token to preserve here (unlike Screen Time's webhook token),
+    // so a plain upsert is enough — running_since/session_period_key are
+    // left out of the payload, so an in-progress session survives an edit.
+    const { error: configError } = await supabase.from("study_timer_config").upsert(
+      {
+        activity_id: id,
+        user_id: user.id,
+        notify_on_goal: input.study_notify_on_goal,
+        notification_template: input.study_notification_template || null,
+      },
+      { onConflict: "activity_id" }
+    );
+    if (configError) throw new Error(configError.message);
+    await supabase.from("leetcode_potd_config").delete().eq("activity_id", id);
+    await supabase.from("gfg_potd_config").delete().eq("activity_id", id);
+    await supabase.from("screentime_config").delete().eq("activity_id", id);
   } else {
     await supabase.from("leetcode_potd_config").delete().eq("activity_id", id);
     await supabase.from("gfg_potd_config").delete().eq("activity_id", id);
     await supabase.from("screentime_config").delete().eq("activity_id", id);
+    await supabase.from("study_timer_config").delete().eq("activity_id", id);
   }
 
   revalidatePath("/");

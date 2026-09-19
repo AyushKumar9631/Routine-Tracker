@@ -8,6 +8,7 @@ import {
   DEFAULT_NOTIFICATION_TEMPLATE,
   DEFAULT_GFG_NOTIFICATION_TEMPLATE,
   DEFAULT_SCREENTIME_NOTIFICATION_TEMPLATES,
+  DEFAULT_STUDY_TIMER_NOTIFICATION_TEMPLATE,
 } from "@/lib/notification-template";
 import { automationDefaults } from "@/lib/utils";
 
@@ -24,7 +25,8 @@ export function ActivityFormFields({
   const isLeetcode = value.automation_type === "leetcode_potd";
   const isGfg = value.automation_type === "gfg_potd";
   const isScreenTime = value.automation_type === "screen_time";
-  const isAutomated = isLeetcode || isGfg || isScreenTime;
+  const isStudyTimer = value.automation_type === "study_timer";
+  const isAutomated = isLeetcode || isGfg || isScreenTime || isStudyTimer;
 
   return (
     <div className="space-y-4">
@@ -80,6 +82,7 @@ export function ActivityFormFields({
             <option value="leetcode_potd">LeetCode Daily Challenge</option>
             <option value="gfg_potd">GFG Problem of the Day</option>
             <option value="screen_time">Smartphone Screen Time</option>
+            <option value="study_timer">Study Timer</option>
           </select>
         </div>
       )}
@@ -288,6 +291,64 @@ export function ActivityFormFields({
                 }
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {isStudyTimer && (
+        <div>
+          <label className="field-label">Daily study goal, in minutes</label>
+          <input
+            type="number"
+            min={1}
+            className="field-input"
+            placeholder="e.g. 120 for 2 hours"
+            required
+            value={value.target_value ?? ""}
+            onChange={(e) =>
+              onChange({
+                target_value: e.target.value === "" ? null : Number(e.target.value),
+              })
+            }
+          />
+          <p className="mt-1 text-xs text-ink-soft">
+            Start the timer from Today and it counts down to zero, then keeps counting in the
+            negative (overtime) until you stop it.
+          </p>
+
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="study-notify-on-goal"
+              checked={value.study_notify_on_goal}
+              onChange={(e) => onChange({ study_notify_on_goal: e.target.checked })}
+              className="h-4 w-4 rounded border-line accent-moss"
+            />
+            <label htmlFor="study-notify-on-goal" className="text-sm text-ink">
+              Notify when the goal is reached
+            </label>
+          </div>
+          <p className="mt-1 text-xs text-ink-soft">
+            Plays a sound and shows a browser notification the moment the timer hits zero, plus a
+            push to your phone if you&apos;ve connected one in Notification settings.
+          </p>
+
+          <div className="mt-3">
+            <label className="field-label">Phone notification message (optional)</label>
+            <textarea
+              className="field-input min-h-[48px] resize-y"
+              placeholder={DEFAULT_STUDY_TIMER_NOTIFICATION_TEMPLATE}
+              value={value.study_notification_template ?? ""}
+              onChange={(e) =>
+                onChange({ study_notification_template: e.target.value === "" ? null : e.target.value })
+              }
+            />
+            <p className="mt-1 text-xs text-ink-soft">
+              Leave blank to use the default above. Variables:{" "}
+              <code className="rounded bg-paper px-1 py-0.5">{"{activity}"}</code>,{" "}
+              <code className="rounded bg-paper px-1 py-0.5">{"{goal}"}</code>,{" "}
+              <code className="rounded bg-paper px-1 py-0.5">{"{studied}"}</code>.
+            </p>
           </div>
         </div>
       )}

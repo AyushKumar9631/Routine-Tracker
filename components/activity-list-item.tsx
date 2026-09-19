@@ -47,6 +47,7 @@ export function ActivityListItem({ activity }: { activity: Activity }) {
           {activity.automation_type === "leetcode_potd" && " \u00b7 auto \u00b7 LeetCode"}
           {activity.automation_type === "gfg_potd" && " \u00b7 auto \u00b7 GFG"}
           {activity.automation_type === "screen_time" && " \u00b7 auto \u00b7 Screen Time (iPhone)"}
+          {activity.automation_type === "study_timer" && " \u00b7 timer \u00b7 Study"}
         </p>
       </div>
 

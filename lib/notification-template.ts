@@ -54,6 +54,19 @@ export const DEFAULT_RECRUITMENT_EVENING_TEMPLATE =
 export const DEFAULT_RECRUITMENT_MORNING_TEMPLATE =
   "Today's the day: {round_type} round with {company} ({role}). Good luck!";
 
+// Study Timer has no deadline/threshold check job either — this fires
+// straight from the browser the moment a live countdown crosses zero (see
+// components/study-timer-card.tsx + actions/study-timer.ts), at most once
+// per session.
+export interface StudyTimerNotificationTemplateVars {
+  activity: string; // the activity's name
+  goal: string; // the daily goal, in minutes
+  studied: string; // minutes studied so far this session (>= goal, since this only fires on reaching it)
+}
+
+export const DEFAULT_STUDY_TIMER_NOTIFICATION_TEMPLATE =
+  "Goal reached for {activity} \u2014 {studied} min studied (goal was {goal} min).";
+
 /**
  * Fills in `{key}` placeholders in a user-supplied template from a vars
  * object. Unrecognized placeholders are left as-is rather than stripped, so

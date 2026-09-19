@@ -4,9 +4,17 @@ import { Nav } from "@/components/nav";
 import { ActivityRow } from "@/components/activity-row";
 import { AddActivityDialog } from "@/components/add-activity-dialog";
 import { ScreenTimeTodayCard } from "@/components/screentime-today-card";
+import { StudyTimerCard } from "@/components/study-timer-card";
+import { TodayTopCards } from "@/components/today-top-cards";
 import { EmptyState } from "@/components/empty-state";
 import { RecruitmentRow } from "@/components/recruitment-row";
-import type { Activity, Completion, RecruitmentDetails, RecruitmentRound } from "@/lib/types";
+import type {
+  Activity,
+  Completion,
+  RecruitmentDetails,
+  RecruitmentRound,
+  StudyTimerConfig,
+} from "@/lib/types";
 import { computeScreenTimeStats } from "@/lib/screentime";
 import { currentRound } from "@/lib/recruitment";
 import { deadlineFor, formatDayLabel, isDueOn, kolkataToday, msUntilDeadline, todayKey } from "@/lib/utils";
@@ -37,10 +45,14 @@ export default async function DashboardPage() {
   const routineActivities = all.filter((a) => a.kind !== "recruitment");
   const recruitmentActivities = all.filter((a) => a.kind === "recruitment");
 
-  // Screen Time is a passive daily readout, not a task with a deadline — it
-  // gets its own gauge card up top instead of a row in the log below.
+  // Screen Time and Study Timer are both passive/self-driven top-of-page
+  // cards, not rows with a deadline — same reasoning for each, just two
+  // different automation types pulled out before the due-today tally.
   const screenTimeActivity = routineActivities.find((a) => a.automation_type === "screen_time") ?? null;
-  const taskActivities = routineActivities.filter((a) => a.automation_type !== "screen_time");
+  const studyTimerActivity = routineActivities.find((a) => a.automation_type === "study_timer") ?? null;
+  const taskActivities = routineActivities.filter(
+    (a) => a.automation_type !== "screen_time" && a.automation_type !== "study_timer"
+  );
   const dueToday = taskActivities.filter((a) => isDueOn(a, today));
 
   let completions: Completion[] = [];
@@ -76,6 +88,29 @@ export default async function DashboardPage() {
       .eq("activity_id", screenTimeActivity.id)
       .maybeSingle();
     screenTimeLastSyncedAt = config?.last_synced_at ?? null;
+  }
+
+  let studyTimerConfig: StudyTimerConfig | null = null;
+  let studyTimerBaseMinutes = 0;
+  if (studyTimerActivity) {
+    const { data } = await supabase
+      .from("study_timer_config")
+      .select("*")
+      .eq("activity_id", studyTimerActivity.id)
+      .maybeSingle();
+    studyTimerConfig = data as StudyTimerConfig | null;
+
+    // While a session is running, its accumulated total lives under
+    // whichever day it started on (session_period_key) — normally today,
+    // but pinned at Start so a session spanning midnight stays put.
+    const basePeriodKey = studyTimerConfig?.session_period_key ?? key;
+    const { data: baseCompletion } = await supabase
+      .from("completions")
+      .select("value")
+      .eq("activity_id", studyTimerActivity.id)
+      .eq("period_key", basePeriodKey)
+      .maybeSingle();
+    studyTimerBaseMinutes = (baseCompletion?.value as number | null) ?? 0;
   }
 
   // Active recruitment drives + each one's current round. A drive only shows
@@ -153,13 +188,42 @@ export default async function DashboardPage() {
           <AddActivityDialog />
         </div>
 
-        {screenTimeActivity && screenTimeStats && (
-          <ScreenTimeTodayCard
-            activity={screenTimeActivity}
-            stats={screenTimeStats}
-            lastSyncedAt={screenTimeLastSyncedAt}
-          />
-        )}
+        <TodayTopCards
+          items={[
+            ...(screenTimeActivity && screenTimeStats
+              ? [
+                  {
+                    id: "screen-time",
+                    node: (
+                      <ScreenTimeTodayCard
+                        activity={screenTimeActivity}
+                        stats={screenTimeStats}
+                        lastSyncedAt={screenTimeLastSyncedAt}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+            ...(studyTimerActivity
+              ? [
+                  {
+                    id: "study-timer",
+                    node: (
+                      <StudyTimerCard
+                        activityId={studyTimerActivity.id}
+                        activityName={studyTimerActivity.name}
+                        activityIcon={studyTimerActivity.icon}
+                        goalMinutes={studyTimerActivity.target_value}
+                        runningSince={studyTimerConfig?.running_since ?? null}
+                        baseMinutes={studyTimerBaseMinutes}
+                        notifyOnGoal={studyTimerConfig?.notify_on_goal ?? true}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
 
         <div className="mb-8">
           <h1 className="font-display text-3xl italic text-ink">

@@ -190,6 +190,8 @@ export function defaultActivityForm(): import("@/lib/types").ActivityFormInput {
     screentime_notify_90_template: null,
     screentime_notify_110_template: null,
     screentime_notify_150_template: null,
+    study_notify_on_goal: true,
+    study_notification_template: null,
   };
 }
 
@@ -238,6 +240,18 @@ export function automationDefaults(
       screentime_notify_110_template: null,
       screentime_notify_150_template: null,
       icon: SCREENTIME_ICON_URL,
+    };
+  }
+  if (automation_type === "study_timer") {
+    return {
+      automation_type,
+      period: "daily",
+      completion_type: "count",
+      unit_label: "min",
+      target_value: null,
+      icon: "\u23F1\ufe0f",
+      study_notify_on_goal: true,
+      study_notification_template: null,
     };
   }
   return { automation_type, period: "daily", completion_type: "boolean" };

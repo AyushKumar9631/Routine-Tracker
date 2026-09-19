@@ -126,6 +126,36 @@ How it works:
   and it's ≥19:00 Kolkata time, or a morning-of push once `test_date` is today
   and it's ≥09:00 — each a one-shot per round, not daily-repeating.
 
+## 7. Study Timer
+
+1. SQL Editor → run `supabase/migrations/017_study_timer.sql` (adds
+   `study_timer_config`, RLS included). No new env vars — it reuses the same
+   `notification_settings`/ntfy topic as every other automation.
+2. In the app: **+ Add activity** → **Study Timer** tile → name it and set a
+   daily goal in minutes (e.g. 120 for "2 hrs DBMS study").
+3. From Today (or the activity's own page), hit **Start** — a live countdown
+   runs from your goal down to zero, then keeps counting in the negative
+   (overtime) until you hit **Stop**. The running session is stored server-side
+   (`study_timer_config.running_since`), so it survives a page reload or
+   closing the tab and coming back.
+4. The moment the countdown crosses zero: a short chime plays, a browser
+   notification pops up (first click asks for permission), and — if you've
+   connected a topic in **Notification settings** — a push goes to your
+   phone too. All three are controlled by the single "Notify when the goal
+   is reached" toggle on the activity.
+5. On Today, Study Timer shares its card slot with Screen Time (if you have
+   both) — swipe or use the arrows/dots to switch between them; both stay
+   "live" underneath even when not the one showing.
+6. The activity's detail page shows the same Start/Stop card plus a
+   four-color heatmap (no study / under 50% / 50–90% / 90%+ of that day's
+   goal) and a 30-day log of minutes studied vs. goal.
+
+How it works: minutes studied land in `completions.value` exactly like
+Screen Time — Stop folds the just-finished session's elapsed time into
+whatever was already logged for that day. There's no cron job; the goal-
+reached notification fires client-side off the live countdown itself
+(`components/study-timer-card.tsx`), not off a server poll.
+
 ## Data model
 
 - **activities** — name, icon/color, `period` (daily/weekly/biweekly/monthly)
@@ -137,3 +167,6 @@ How it works:
   date of that instance), with `completed`, `value`, and a timestamp. This is
   the table any future automation (a cron job, a webhook, an edge function)
   would write into instead of you clicking a checkbox.
+- **study_timer_config** — one row per Study Timer activity: `running_since`
+  (non-null while a session is live), `session_period_key` (the day the live
+  session's minutes belong to), and the notify toggle/custom phone message.
