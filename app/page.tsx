@@ -6,11 +6,15 @@ import { AddActivityDialog } from "@/components/add-activity-dialog";
 import { ScreenTimeTodayCard } from "@/components/screentime-today-card";
 import { StudyTimerCard } from "@/components/study-timer-card";
 import { TodayTopCards } from "@/components/today-top-cards";
+import { QuickStopwatchButton } from "@/components/quick-stopwatch-button";
+import { QuickStopwatchRow } from "@/components/quick-stopwatch-row";
+import { QuickStopwatchCompletedRow } from "@/components/quick-stopwatch-completed-row";
 import { EmptyState } from "@/components/empty-state";
 import { RecruitmentRow } from "@/components/recruitment-row";
 import type {
   Activity,
   Completion,
+  QuickStopwatch,
   RecruitmentDetails,
   RecruitmentRound,
   StudyTimerConfig,
@@ -113,6 +117,25 @@ export default async function DashboardPage() {
     studyTimerBaseMinutes = (baseCompletion?.value as number | null) ?? 0;
   }
 
+  // Quick Stopwatch is a separate, un-scheduled utility — not in
+  // `activities` at all, so it never touches taskActivities/dueToday or the
+  // "X of Y done" tally. Active (running/paused) ones aren't day-scoped;
+  // period_key is only assigned once one is completed.
+  const { data: activeStopwatchRows } = await supabase
+    .from("quick_stopwatches")
+    .select("*")
+    .in("status", ["running", "paused"])
+    .order("created_at", { ascending: true });
+  const activeStopwatches = (activeStopwatchRows ?? []) as QuickStopwatch[];
+
+  const { data: completedStopwatchRows } = await supabase
+    .from("quick_stopwatches")
+    .select("*")
+    .eq("status", "completed")
+    .eq("period_key", key)
+    .order("completed_at", { ascending: false });
+  const completedStopwatches = (completedStopwatchRows ?? []) as QuickStopwatch[];
+
   // Active recruitment drives + each one's current round. A drive only shows
   // here while recruitment_details.status = 'active' — once rejected or
   // turned into an offer it drops out of Today and only appears in history
@@ -185,7 +208,10 @@ export default async function DashboardPage() {
 
         <div className="mb-6 flex items-end justify-between">
           <p className="text-sm text-ink-soft">{formatDayLabel(today)}</p>
-          <AddActivityDialog />
+          <div className="flex items-center gap-2">
+            <QuickStopwatchButton />
+            <AddActivityDialog />
+          </div>
         </div>
 
         <TodayTopCards
@@ -222,6 +248,18 @@ export default async function DashboardPage() {
                   },
                 ]
               : []),
+            ...activeStopwatches.map((sw) => ({
+              id: `quick-stopwatch-${sw.id}`,
+              node: (
+                <QuickStopwatchRow
+                  id={sw.id}
+                  label={sw.label}
+                  status={sw.status as "running" | "paused"}
+                  accumulatedSeconds={sw.accumulated_seconds}
+                  runningSince={sw.running_since}
+                />
+              ),
+            })),
           ]}
         />
 
@@ -254,40 +292,49 @@ export default async function DashboardPage() {
             description="Nothing is scheduled for today. Check Activities to see what's coming up."
           />
         ) : (
-          <>
+          <ul>
+            {uncompletedToday.map((activity) => (
+              <ActivityRow
+                key={activity.id}
+                activity={activity}
+                completion={completionByActivity.get(activity.id) ?? null}
+                periodKey={key}
+                deadline={deadlineFor(activity, now)?.toISOString() ?? null}
+              />
+            ))}
+          </ul>
+        )}
+
+        {/*
+          Deliberately outside the ternary above: a Quick Stopwatch isn't a
+          routine activity at all, so it can have completions today even on
+          a day with nothing scheduled (or no activities yet) — it must
+          never be hidden by, or feed into, the routine done/total tally.
+        */}
+        {(completedToday.length > 0 || completedStopwatches.length > 0) && (
+          <div className="mt-10">
+            <div className="mb-1 flex items-center gap-3">
+              <h2 className="shrink-0 text-xs text-ink-soft">Completed ({completedToday.length})</h2>
+              <div className="h-px flex-1 bg-line" />
+            </div>
             <ul>
-              {uncompletedToday.map((activity) => (
+              {completedToday.map((activity) => (
                 <ActivityRow
                   key={activity.id}
                   activity={activity}
                   completion={completionByActivity.get(activity.id) ?? null}
                   periodKey={key}
-                  deadline={deadlineFor(activity, now)?.toISOString() ?? null}
+                />
+              ))}
+              {completedStopwatches.map((sw) => (
+                <QuickStopwatchCompletedRow
+                  key={sw.id}
+                  label={sw.label}
+                  accumulatedSeconds={sw.accumulated_seconds}
                 />
               ))}
             </ul>
-
-            {completedToday.length > 0 && (
-              <div className="mt-10">
-                <div className="mb-1 flex items-center gap-3">
-                  <h2 className="shrink-0 text-xs text-ink-soft">
-                    Completed ({completedToday.length})
-                  </h2>
-                  <div className="h-px flex-1 bg-line" />
-                </div>
-                <ul>
-                  {completedToday.map((activity) => (
-                    <ActivityRow
-                      key={activity.id}
-                      activity={activity}
-                      completion={completionByActivity.get(activity.id) ?? null}
-                      periodKey={key}
-                    />
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
+          </div>
         )}
 
         {/*

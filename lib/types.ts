@@ -93,6 +93,19 @@ export interface StudyTimerConfig {
   updated_at: string;
 }
 
+export interface QuickStopwatch {
+  id: string;
+  user_id: string;
+  label: string;
+  status: "running" | "paused" | "completed";
+  accumulated_seconds: number;
+  running_since: string | null;
+  completed_at: string | null;
+  period_key: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Completion {
   id: string;
   activity_id: string;
