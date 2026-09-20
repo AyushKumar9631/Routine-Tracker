@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,6 +14,18 @@ export function TodayTopCards({ items }: { items: { id: string; node: React.Reac
   const [index, setIndex] = useState(0);
   const startX = useRef<number | null>(null);
   const deltaX = useRef(0);
+  const prevLengthRef = useRef(items.length);
+
+  // A new card (e.g. a just-started Quick Stopwatch) is always appended at
+  // the end — jump to it so the user sees what they just added, without
+  // disturbing the position on any other update (pause/resume, a tick,
+  // etc. don't change items.length, so this stays a no-op then).
+  useEffect(() => {
+    if (items.length > prevLengthRef.current) {
+      setIndex(items.length - 1);
+    }
+    prevLengthRef.current = items.length;
+  }, [items.length]);
 
   if (items.length === 0) return null;
   if (items.length === 1) return <div>{items[0].node}</div>;
