@@ -1,8 +1,21 @@
 import { ActivityIcon } from "@/components/activity-icon";
 import { ScreenTimeGauge } from "@/components/screentime-gauge";
-import { formatScreenTimeLong, type ScreenTimeStats } from "@/lib/screentime";
+import {
+  GAUGE_OVERSHOOT,
+  formatScreenTimeLong,
+  recentScreenTimeDays,
+  screenTimeLevel,
+  type ScreenTimeLevel,
+  type ScreenTimeStats,
+} from "@/lib/screentime";
 import type { Activity } from "@/lib/types";
-import { formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
+
+const LEVEL_BAR: Record<ScreenTimeLevel, string> = {
+  moss: "bg-moss",
+  amber: "bg-amber",
+  rust: "bg-rust",
+};
 
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
@@ -13,17 +26,44 @@ function StatRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function TrendBadge({
+  todayMinutes,
+  weeklyAverageMinutes,
+}: {
+  todayMinutes: number | null;
+  weeklyAverageMinutes: number | null;
+}) {
+  if (todayMinutes == null || !weeklyAverageMinutes) return null;
+  const pct = Math.round(((todayMinutes - weeklyAverageMinutes) / weeklyAverageMinutes) * 100);
+  if (pct === 0) return <span className="text-xs text-ink-soft">On par with your weekly average</span>;
+  const down = pct < 0;
+  return (
+    <span className={cn("inline-flex items-center gap-1 text-xs font-medium", down ? "text-moss" : "text-rust")}>
+      <span aria-hidden="true">{down ? "\u25be" : "\u25b4"}</span>
+      {Math.abs(pct)}% {down ? "below" : "above"} weekly average
+    </span>
+  );
+}
+
 export function ScreenTimeTodayCard({
   activity,
   stats,
   lastSyncedAt,
+  history = [],
+  todayDateKey,
 }: {
   activity: Activity;
   stats: ScreenTimeStats;
   lastSyncedAt: string | null;
+  /** Raw period_key/value history (same rows used for `stats`) — feeds the desktop heat strip. */
+  history?: { period_key: string; value: number | null }[];
+  todayDateKey: string;
 }) {
+  const days = recentScreenTimeDays(history, todayDateKey, 14);
+  const scale = activity.target_value ? activity.target_value * GAUGE_OVERSHOOT : 240;
+
   return (
-    <div className="mb-6 rounded border border-line bg-card p-5">
+    <div className="card-interactive mb-6 rounded border border-line bg-card p-5 lg:rounded-xl">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ActivityIcon icon={activity.icon} className="text-base" />
@@ -35,12 +75,38 @@ export function ScreenTimeTodayCard({
       <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
         <div className="w-full shrink-0 sm:w-[190px]">
           <ScreenTimeGauge minutes={stats.todayMinutes ?? 0} limitMinutes={activity.target_value} />
+          <div className="mt-1 text-center">
+            <TrendBadge todayMinutes={stats.todayMinutes} weeklyAverageMinutes={stats.weeklyAverageMinutes} />
+          </div>
         </div>
 
         <div className="w-full divide-y divide-line sm:pl-6">
           <StatRow label="Weekly average" value={formatScreenTimeLong(stats.weeklyAverageMinutes)} />
           <StatRow label="Monthly average" value={formatScreenTimeLong(stats.monthlyAverageMinutes)} />
           <StatRow label="Week lowest" value={formatScreenTimeLong(stats.weekLowestMinutes)} />
+        </div>
+      </div>
+
+      {/* Desktop-only heat strip — a sparkline of bars rather than a square
+          grid, so Screen Time's card reads distinctly from the other cards. */}
+      <div className="hidden lg:block lg:mt-5 lg:border-t lg:border-line/70 lg:pt-4">
+        <p className="mb-2 text-[11px] uppercase tracking-wider text-ink-soft">Last 14 days</p>
+        <div className="flex h-12 items-end gap-1.5">
+          {days.map((d, i) => {
+            const level = d.minutes == null ? null : screenTimeLevel(d.minutes, activity.target_value);
+            const heightPct = d.minutes == null ? 6 : Math.max(8, Math.min(100, (d.minutes / scale) * 100));
+            return (
+              <div
+                key={d.key}
+                title={`${d.key}: ${formatScreenTimeLong(d.minutes)}`}
+                className={cn(
+                  "animate-heat-pop flex-1 rounded-t-sm transition-all duration-300 hover:opacity-75",
+                  d.minutes == null ? "bg-line/40" : LEVEL_BAR[level as ScreenTimeLevel]
+                )}
+                style={{ height: `${heightPct}%`, animationDelay: `${i * 25}ms` }}
+              />
+            );
+          })}
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { pauseQuickStopwatch, resumeQuickStopwatch, completeQuickStopwatch } from "@/actions/quick-stopwatch";
 import { StopwatchIcon } from "@/components/stopwatch-icon";
 import { formatStudyClock, liveElapsedSeconds } from "@/lib/study-timer";
+import { cn } from "@/lib/utils";
 
 export function QuickStopwatchRow({
   id,
@@ -80,31 +81,58 @@ export function QuickStopwatchRow({
     });
   }
 
+  const isRunning = status === "running";
+
   return (
-    <div className="mb-6 rounded border border-line bg-card p-5">
+    <div
+      className={cn(
+        "card-interactive relative mb-6 rounded border border-line bg-card p-5 lg:rounded-xl",
+        isRunning && "ring-pulse-amber"
+      )}
+    >
       <div className="mb-4 flex items-center gap-2">
         <StopwatchIcon className="h-4 w-4 text-ink-soft" />
         <span className="truncate text-sm text-ink-soft">{label}</span>
       </div>
 
       <div className="flex flex-col items-center gap-3 py-2">
-        <div className="font-mono text-5xl tabular-nums text-ink">{formatStudyClock(totalSeconds)}</div>
-        <p className="text-xs text-ink-soft">{status === "running" ? "studying now" : "paused"}</p>
+        <div className="relative flex h-36 w-36 items-center justify-center lg:h-44 lg:w-44">
+          <svg
+            viewBox="0 0 120 120"
+            className={cn("absolute inset-0 h-full w-full", isRunning && "animate-spin-slow")}
+            aria-hidden="true"
+          >
+            <circle
+              cx="60"
+              cy="60"
+              r="54"
+              fill="none"
+              strokeWidth="4"
+              strokeDasharray="3 11"
+              strokeLinecap="round"
+              className={isRunning ? "stroke-amber" : "stroke-line"}
+            />
+          </svg>
+          <div className="font-mono text-4xl tabular-nums text-ink lg:text-5xl">
+            {formatStudyClock(totalSeconds)}
+          </div>
+        </div>
+        <p className="text-xs text-ink-soft">{isRunning ? "studying now" : "paused"}</p>
 
         <div className="mt-1 flex gap-3">
           <button
             type="button"
             onClick={handleToggle}
             disabled={isPending}
-            className="rounded border border-line px-5 py-2 text-sm font-medium text-ink transition-colors hover:border-moss disabled:opacity-50"
+            className="rounded border border-line px-5 py-2 text-sm font-medium text-ink transition-all duration-200 hover:scale-105 hover:border-moss active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
           >
-            {status === "running" ? "Pause" : "Resume"}
+            {isRunning ? "Pause" : "Resume"}
           </button>
           <button
             type="button"
             onClick={handleComplete}
             disabled={isPending}
-            className="rounded bg-moss px-5 py-2 text-sm font-medium text-paper transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="rounded bg-moss px-5 py-2 text-sm font-medium text-paper transition-all duration-200 hover:scale-105 hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
           >
             Complete
           </button>

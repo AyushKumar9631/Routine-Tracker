@@ -141,6 +141,30 @@ export function screenTimeLimitMarkFraction(): number {
   return 1 / GAUGE_OVERSHOOT;
 }
 
+export interface ScreenTimeDayPoint {
+  key: string;
+  minutes: number | null;
+}
+
+/** Last `days` calendar days (oldest first) of screen-time minutes — powers the dashboard card's heat strip. */
+export function recentScreenTimeDays(
+  completions: { period_key: string; value: number | null }[],
+  todayDateKey: string,
+  days: number
+): ScreenTimeDayPoint[] {
+  const byKey = new Map(completions.map((c) => [c.period_key, c.value]));
+  const cursor = parseDateKey(todayDateKey);
+  cursor.setDate(cursor.getDate() - (days - 1));
+
+  const out: ScreenTimeDayPoint[] = [];
+  for (let i = 0; i < days; i++) {
+    const key = formatDateKey(cursor);
+    out.push({ key, minutes: byKey.get(key) ?? null });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return out;
+}
+
 export const SCREENTIME_NOTIFY_THRESHOLDS = [90, 110, 150] as const;
 
 /**

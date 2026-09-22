@@ -3,9 +3,14 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { startStudyTimer, stopStudyTimer, notifyStudyGoalReached } from "@/actions/study-timer";
 import { ActivityIcon } from "@/components/activity-icon";
+import { CompletionHeatmap } from "@/components/completion-heatmap";
 import { formatScreenTimeLong } from "@/lib/screentime";
 import { formatStudyClock, liveElapsedSeconds } from "@/lib/study-timer";
+import type { Activity, Completion } from "@/lib/types";
 import { cn, isImageIcon } from "@/lib/utils";
+
+const RING_R = 54;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_R;
 
 /** A short ascending three-note chime via the Web Audio API — no audio file to ship or host. */
 function playChime(ctxRef: { current: AudioContext | null }) {
@@ -56,6 +61,8 @@ export function StudyTimerCard({
   runningSince: initialRunningSince,
   baseMinutes: initialBaseMinutes,
   notifyOnGoal,
+  activity,
+  heatmapCompletions = [],
 }: {
   activityId: string;
   activityName: string;
@@ -64,6 +71,9 @@ export function StudyTimerCard({
   runningSince: string | null;
   baseMinutes: number;
   notifyOnGoal: boolean;
+  /** Full activity row — only used to drive the desktop card's heatmap. */
+  activity?: Activity;
+  heatmapCompletions?: Completion[];
 }) {
   const [runningSince, setRunningSince] = useState(initialRunningSince);
   const [baseMinutes, setBaseMinutes] = useState(initialBaseMinutes);
@@ -166,9 +176,15 @@ export function StudyTimerCard({
 
   const isRunning = Boolean(runningSince);
   const goalReached = remaining <= 0;
+  const fraction = goalSeconds > 0 ? Math.min(1, Math.max(0, studiedSeconds / goalSeconds)) : 0;
 
   return (
-    <div className="mb-6 rounded border border-line bg-card p-5">
+    <div
+      className={cn(
+        "card-interactive relative mb-6 rounded border border-line bg-card p-5 lg:rounded-xl",
+        isRunning && "ring-pulse-moss"
+      )}
+    >
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ActivityIcon icon={activityIcon} className="text-base" />
@@ -180,14 +196,35 @@ export function StudyTimerCard({
       </div>
 
       <div className="flex flex-col items-center gap-3 py-2">
-        <div
-          className={cn(
-            "font-mono text-5xl tabular-nums",
-            goalReached ? "text-moss" : isRunning ? "text-ink" : "text-ink-soft"
-          )}
-          style={{ fontVariantNumeric: "tabular-nums" }}
-        >
-          {formatStudyClock(remaining)}
+        <div className="relative flex h-36 w-36 items-center justify-center lg:h-44 lg:w-44">
+          {goalMinutes ? (
+            <svg viewBox="0 0 120 120" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden="true">
+              <circle cx="60" cy="60" r={RING_R} fill="none" strokeWidth="6" className="stroke-line" />
+              <circle
+                cx="60"
+                cy="60"
+                r={RING_R}
+                fill="none"
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray={RING_CIRCUMFERENCE}
+                strokeDashoffset={RING_CIRCUMFERENCE * (1 - fraction)}
+                className={cn(
+                  "transition-[stroke-dashoffset] duration-700 ease-out",
+                  goalReached ? "stroke-moss" : isRunning ? "stroke-ink" : "stroke-ink-soft/50"
+                )}
+              />
+            </svg>
+          ) : null}
+          <div
+            className={cn(
+              "font-mono text-4xl tabular-nums lg:text-5xl",
+              goalReached ? "text-moss" : isRunning ? "text-ink" : "text-ink-soft"
+            )}
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            {formatStudyClock(remaining)}
+          </div>
         </div>
         <p className="text-xs text-ink-soft">
           {formatScreenTimeLong(Math.max(0, studiedSeconds) / 60)} studied
@@ -199,7 +236,7 @@ export function StudyTimerCard({
           onClick={isRunning ? handleStop : handleStart}
           disabled={isPending || !goalMinutes}
           className={cn(
-            "mt-1 rounded px-6 py-2 text-sm font-medium text-paper transition-opacity hover:opacity-90 disabled:opacity-50",
+            "mt-1 rounded px-6 py-2 text-sm font-medium text-paper transition-all duration-200 hover:opacity-90 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100",
             isRunning ? "bg-rust" : "bg-moss"
           )}
         >
@@ -211,6 +248,13 @@ export function StudyTimerCard({
         )}
         {error && <p className="text-xs text-rust">{error}</p>}
       </div>
+
+      {activity && (
+        <div className="hidden lg:block lg:mt-5 lg:border-t lg:border-line/70 lg:pt-4">
+          <p className="mb-2 text-[11px] uppercase tracking-wider text-ink-soft">Last 10 weeks</p>
+          <CompletionHeatmap activity={activity} completions={heatmapCompletions} weeks={10} compact />
+        </div>
+      )}
     </div>
   );
 }

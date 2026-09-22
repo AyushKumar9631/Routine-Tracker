@@ -21,7 +21,19 @@ import type {
 } from "@/lib/types";
 import { computeScreenTimeStats } from "@/lib/screentime";
 import { currentRound } from "@/lib/recruitment";
-import { deadlineFor, formatDayLabel, isDueOn, kolkataToday, msUntilDeadline, todayKey } from "@/lib/utils";
+import {
+  deadlineFor,
+  formatDateKey,
+  formatDayLabel,
+  isDueOn,
+  kolkataToday,
+  msUntilDeadline,
+  todayKey,
+} from "@/lib/utils";
+
+// How far back the dashboard's per-card heatmaps look — a compact ~10-week
+// strip, not the full 18-week view used on the activity detail page.
+const HEATMAP_DAYS = 70;
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -41,6 +53,9 @@ export default async function DashboardPage() {
   const now = new Date();
   const today = kolkataToday(now);
   const key = todayKey(now);
+  const heatmapStart = new Date(today);
+  heatmapStart.setDate(heatmapStart.getDate() - HEATMAP_DAYS);
+  const heatmapStartKey = formatDateKey(heatmapStart);
 
   // Recruitment drives are a different `kind` of activity entirely — they
   // never have a period/deadline and must never enter the due-today/done
@@ -72,7 +87,27 @@ export default async function DashboardPage() {
     completions = (data ?? []) as Completion[];
   }
 
+  // Recent history for each due-today card's desktop heatmap — batched into
+  // one query rather than one per activity.
+  const heatmapByActivity = new Map<string, Completion[]>();
+  if (dueToday.length > 0) {
+    const { data: heatmapData } = await supabase
+      .from("completions")
+      .select("*")
+      .gte("period_key", heatmapStartKey)
+      .in(
+        "activity_id",
+        dueToday.map((a) => a.id)
+      );
+    for (const c of (heatmapData ?? []) as Completion[]) {
+      const list = heatmapByActivity.get(c.activity_id) ?? [];
+      list.push(c);
+      heatmapByActivity.set(c.activity_id, list);
+    }
+  }
+
   let screenTimeStats = null;
+  let screenTimeHistory: { period_key: string; value: number | null }[] = [];
   let screenTimeLastSyncedAt: string | null = null;
   if (screenTimeActivity) {
     const { data } = await supabase
@@ -81,10 +116,8 @@ export default async function DashboardPage() {
       .eq("activity_id", screenTimeActivity.id)
       .order("period_key", { ascending: false })
       .limit(400);
-    screenTimeStats = computeScreenTimeStats(
-      (data ?? []) as { period_key: string; value: number | null }[],
-      key
-    );
+    screenTimeHistory = (data ?? []) as { period_key: string; value: number | null }[];
+    screenTimeStats = computeScreenTimeStats(screenTimeHistory, key);
 
     const { data: config } = await supabase
       .from("screentime_config")
@@ -115,6 +148,16 @@ export default async function DashboardPage() {
       .eq("period_key", basePeriodKey)
       .maybeSingle();
     studyTimerBaseMinutes = (baseCompletion?.value as number | null) ?? 0;
+  }
+
+  let studyTimerHeatmap: Completion[] = [];
+  if (studyTimerActivity) {
+    const { data } = await supabase
+      .from("completions")
+      .select("*")
+      .eq("activity_id", studyTimerActivity.id)
+      .gte("period_key", heatmapStartKey);
+    studyTimerHeatmap = (data ?? []) as Completion[];
   }
 
   // Quick Stopwatch is a separate, un-scheduled utility — not in
@@ -193,7 +236,7 @@ export default async function DashboardPage() {
     <div className="min-h-screen">
       <Nav />
 
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="mx-auto max-w-3xl px-6 py-10 lg:max-w-6xl">{/* lg:max-w-6xl gives the card grid room to breathe on desktop */}
         {needsPassword && (
           <div className="mb-8 flex items-center justify-between gap-4 rounded border border-amber/40 bg-amber-soft px-4 py-3 text-sm text-ink">
             <span>You're signed in via a one-time link. Set a password to skip the email step next time.</span>
@@ -225,6 +268,8 @@ export default async function DashboardPage() {
                         activity={screenTimeActivity}
                         stats={screenTimeStats}
                         lastSyncedAt={screenTimeLastSyncedAt}
+                        history={screenTimeHistory}
+                        todayDateKey={key}
                       />
                     ),
                   },
@@ -243,6 +288,8 @@ export default async function DashboardPage() {
                         runningSince={studyTimerConfig?.running_since ?? null}
                         baseMinutes={studyTimerBaseMinutes}
                         notifyOnGoal={studyTimerConfig?.notify_on_goal ?? true}
+                        activity={studyTimerActivity}
+                        heatmapCompletions={studyTimerHeatmap}
                       />
                     ),
                   },
@@ -292,7 +339,7 @@ export default async function DashboardPage() {
             description="Nothing is scheduled for today. Check Activities to see what's coming up."
           />
         ) : (
-          <ul>
+          <ul className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 xl:grid-cols-3">
             {uncompletedToday.map((activity) => (
               <ActivityRow
                 key={activity.id}
@@ -300,6 +347,7 @@ export default async function DashboardPage() {
                 completion={completionByActivity.get(activity.id) ?? null}
                 periodKey={key}
                 deadline={deadlineFor(activity, now)?.toISOString() ?? null}
+                heatmapCompletions={heatmapByActivity.get(activity.id) ?? []}
               />
             ))}
           </ul>
@@ -317,13 +365,14 @@ export default async function DashboardPage() {
               <h2 className="shrink-0 text-xs text-ink-soft">Completed ({completedToday.length})</h2>
               <div className="h-px flex-1 bg-line" />
             </div>
-            <ul>
+            <ul className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 xl:grid-cols-3">
               {completedToday.map((activity) => (
                 <ActivityRow
                   key={activity.id}
                   activity={activity}
                   completion={completionByActivity.get(activity.id) ?? null}
                   periodKey={key}
+                  heatmapCompletions={heatmapByActivity.get(activity.id) ?? []}
                 />
               ))}
               {completedStopwatches.map((sw) => (

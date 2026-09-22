@@ -27,3 +27,72 @@
       placeholder:text-ink-soft/60 focus:border-moss focus:outline-none transition-colors;
   }
 }
+
+@layer utilities {
+  @keyframes heat-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes spin-slow {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes ring-pulse-moss {
+    0% {
+      box-shadow: 0 0 0 0 rgba(63, 107, 71, 0.35);
+    }
+    70% {
+      box-shadow: 0 0 0 10px rgba(63, 107, 71, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(63, 107, 71, 0);
+    }
+  }
+  @keyframes ring-pulse-amber {
+    0% {
+      box-shadow: 0 0 0 0 rgba(176, 124, 44, 0.35);
+    }
+    70% {
+      box-shadow: 0 0 0 10px rgba(176, 124, 44, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(176, 124, 44, 0);
+    }
+  }
+
+  .animate-heat-pop {
+    animation: heat-pop 0.35s ease-out backwards;
+  }
+  .animate-spin-slow {
+    animation: spin-slow 5s linear infinite;
+  }
+}
+
+/*
+ * Dashboard card interactivity — this turn's PC-only UI pass. Wrapped in the
+ * lg breakpoint's raw media query (rather than Tailwind's lg: variant on
+ * each usage) so it stays completely inert below 1024px no matter which
+ * component applies these classnames — mobile is untouched by design.
+ */
+@media (min-width: 1024px) {
+  .card-interactive {
+    transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease;
+  }
+  .card-interactive:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px -14px rgba(28, 31, 27, 0.24);
+  }
+  .ring-pulse-moss {
+    animation: ring-pulse-moss 2.2s ease-out infinite;
+  }
+  .ring-pulse-amber {
+    animation: ring-pulse-amber 2.2s ease-out infinite;
+  }
+}

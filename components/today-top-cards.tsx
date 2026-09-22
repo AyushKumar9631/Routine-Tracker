@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
  */
 export function TodayTopCards({ items }: { items: { id: string; node: React.ReactNode }[] }) {
   const [index, setIndex] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(false);
   const startX = useRef<number | null>(null);
   const deltaX = useRef(0);
   const prevLengthRef = useRef(items.length);
@@ -27,7 +28,33 @@ export function TodayTopCards({ items }: { items: { id: string; node: React.Reac
     prevLengthRef.current = items.length;
   }, [items.length]);
 
+  // Starts false so the server-rendered markup and the first client render
+  // match exactly (same trick as useDeadlineCountdown) — on a desktop
+  // viewport this flips true a moment after mount and swaps the swipe
+  // carousel for a grid that shows every card at once.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
   if (items.length === 0) return null;
+
+  if (isDesktop) {
+    return (
+      // Each card still carries its own mb-6 for the (unchanged) mobile
+      // single-card layout — canceled here since the grid's own gap handles
+      // spacing between cards instead.
+      <div className="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-3 [&_.card-interactive]:!mb-0">
+        {items.map((item) => (
+          <div key={item.id}>{item.node}</div>
+        ))}
+      </div>
+    );
+  }
+
   if (items.length === 1) return <div>{items[0].node}</div>;
 
   const clamped = Math.min(index, items.length - 1);
