@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { LeetcodeSyncButton } from "@/components/leetcode-sync-button";
 import type { Activity, Completion } from "@/lib/types";
-import { calcStreak, cn, formatDateKey, parseDateKey } from "@/lib/utils";
+import { calcStreak, cn, formatDateKey, isImageIcon, parseDateKey } from "@/lib/utils";
 
 // LeetCode's own difficulty colors — the same standard values used across
 // its problem list, problem header, and profile stats (light and dark).
@@ -24,7 +24,21 @@ const ACCENT = "#FFA116";
 const LEETCODE_FONT =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
-function LeetcodeMark({ className }: { className?: string }) {
+/** Activity's own icon (set on the activity, e.g. a custom URL or emoji) when present, else the "LC" badge. */
+function LeetcodeMark({ icon, className }: { icon?: string | null; className?: string }) {
+  if (icon && isImageIcon(icon)) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={icon} alt="" className={cn("h-9 w-9 shrink-0 rounded-lg object-contain", className)} />
+    );
+  }
+  if (icon) {
+    return (
+      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xl", className)} aria-hidden="true">
+        {icon}
+      </span>
+    );
+  }
   return (
     <span
       className={cn(
@@ -47,14 +61,14 @@ function FlameIcon({ className }: { className?: string }) {
   );
 }
 
-/** Last 7 calendar days (oldest first), each flagged done/not — the card's tally strip. */
-function last7Days(completions: Completion[], todayDateKey: string) {
+/** Last 10 calendar days (oldest first), each flagged done/not — the card's tally strip. */
+function last10Days(completions: Completion[], todayDateKey: string) {
   const completedKeys = new Set(completions.filter((c) => c.completed).map((c) => c.period_key));
   const cursor = parseDateKey(todayDateKey);
-  cursor.setDate(cursor.getDate() - 6);
+  cursor.setDate(cursor.getDate() - 9);
 
   const days: { key: string; done: boolean }[] = [];
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 10; i++) {
     const dayKey = formatDateKey(cursor);
     days.push({ key: dayKey, done: completedKeys.has(dayKey) });
     cursor.setDate(cursor.getDate() + 1);
@@ -73,7 +87,7 @@ export function LeetcodeCard({
   activity: Activity;
   completion: Completion | null;
   periodKey: string;
-  /** Recent completion history (see app/page.tsx) — drives the streak count and the 7-day tally. */
+  /** Recent completion history (see app/page.tsx) — drives the streak count and the 10-day tally. */
   heatmapCompletions: Completion[];
   leetcodeUsername: string | null;
   /** Today's POTD difficulty, persisted by the last sync (lib/leetcode-sync.ts) — null until the first check. */
@@ -81,7 +95,7 @@ export function LeetcodeCard({
 }) {
   const isDone = completion?.completed ?? false;
   const streak = calcStreak(activity, heatmapCompletions);
-  const days = last7Days(heatmapCompletions, periodKey);
+  const days = last10Days(heatmapCompletions, periodKey);
   const difficultyColor = difficulty ? DIFFICULTY_COLOR[difficulty] : null;
 
   return (
@@ -95,7 +109,7 @@ export function LeetcodeCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <LeetcodeMark />
+          <LeetcodeMark icon={activity.icon} />
           <div className="min-w-0">
             <Link
               href={`/activities/${activity.id}`}
@@ -132,20 +146,25 @@ export function LeetcodeCard({
       </div>
 
       <div className="mt-5 flex items-end justify-between gap-4">
-        <div className="flex items-end gap-1.5">
+        <div className="flex items-end gap-1">
           {days.map((d) => (
             <span
               key={d.key}
               title={d.key}
               className={cn(
-                "h-7 w-[3px] -rotate-6 rounded-full transition-all duration-300",
+                "h-7 w-2.5 skew-x-[-12deg] transition-all duration-300",
                 d.done ? "bg-[#FFA116] shadow-[0_0_6px_rgba(255,161,22,0.6)]" : "bg-[#262626]/10 dark:bg-white/10"
               )}
             />
           ))}
         </div>
 
-        <LeetcodeSyncButton activityId={activity.id} variant="leetcode" autoSyncActive={!isDone} />
+        <LeetcodeSyncButton
+          activityId={activity.id}
+          variant="leetcode"
+          autoSyncActive={!isDone}
+          initialSolved={isDone}
+        />
       </div>
     </li>
   );
