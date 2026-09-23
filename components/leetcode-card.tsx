@@ -61,14 +61,14 @@ function FlameIcon({ className }: { className?: string }) {
   );
 }
 
-/** Last 10 calendar days (oldest first), each flagged done/not — the card's tally strip. */
-function last10Days(completions: Completion[], todayDateKey: string) {
+/** Last 14 calendar days (oldest first), each flagged done/not — the card's tally strip. */
+function last14Days(completions: Completion[], todayDateKey: string) {
   const completedKeys = new Set(completions.filter((c) => c.completed).map((c) => c.period_key));
   const cursor = parseDateKey(todayDateKey);
-  cursor.setDate(cursor.getDate() - 9);
+  cursor.setDate(cursor.getDate() - 13);
 
   const days: { key: string; done: boolean }[] = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 14; i++) {
     const dayKey = formatDateKey(cursor);
     days.push({ key: dayKey, done: completedKeys.has(dayKey) });
     cursor.setDate(cursor.getDate() + 1);
@@ -87,7 +87,7 @@ export function LeetcodeCard({
   activity: Activity;
   completion: Completion | null;
   periodKey: string;
-  /** Recent completion history (see app/page.tsx) — drives the streak count and the 10-day tally. */
+  /** Recent completion history (see app/page.tsx) — drives the streak count and the 14-day tally. */
   heatmapCompletions: Completion[];
   leetcodeUsername: string | null;
   /** Today's POTD difficulty, persisted by the last sync (lib/leetcode-sync.ts) — null until the first check. */
@@ -95,7 +95,7 @@ export function LeetcodeCard({
 }) {
   const isDone = completion?.completed ?? false;
   const streak = calcStreak(activity, heatmapCompletions);
-  const days = last10Days(heatmapCompletions, periodKey);
+  const days = last14Days(heatmapCompletions, periodKey);
   const difficultyColor = difficulty ? DIFFICULTY_COLOR[difficulty] : null;
 
   return (
@@ -152,7 +152,7 @@ export function LeetcodeCard({
               key={d.key}
               title={d.key}
               className={cn(
-                "h-7 w-2.5 skew-x-[-12deg] transition-all duration-300",
+                "h-7 w-2 skew-x-[-12deg] transition-all duration-300",
                 d.done ? "bg-[#FFA116] shadow-[0_0_6px_rgba(255,161,22,0.6)]" : "bg-[#262626]/10 dark:bg-white/10"
               )}
             />
