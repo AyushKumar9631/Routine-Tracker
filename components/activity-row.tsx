@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { logCompletion } from "@/actions/completions";
-import { LeetcodeSyncButton } from "@/components/leetcode-sync-button";
 import { GfgSyncButton } from "@/components/gfg-sync-button";
 import { DeadlineBadge, useDeadlineCountdown, type Urgency } from "@/components/deadline-countdown";
 import { ActivityIcon } from "@/components/activity-icon";
@@ -11,6 +10,10 @@ import { CompletionHeatmap } from "@/components/completion-heatmap";
 import type { Activity, Completion } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+// Note: LeetCode POTD activities never reach this component — app/page.tsx
+// routes those to components/leetcode-card.tsx instead. This is the shared
+// card for everything else (GFG and plain activities), until each of those
+// gets its own redesign in a later turn.
 const URGENCY_RULE: Record<Urgency, string> = {
   safe: "border-l-moss",
   warn: "border-l-amber",
@@ -37,11 +40,10 @@ export function ActivityRow({
   const { msLeft, urgency } = useDeadlineCountdown(deadline);
 
   const isDone = completion?.completed ?? false;
-  const isLeetcode = activity.is_automated && activity.automation_type === "leetcode_potd";
   const isGfg = activity.is_automated && activity.automation_type === "gfg_potd";
   const isScreenTime = activity.is_automated && activity.automation_type === "screen_time";
-  const isAutomated = isLeetcode || isGfg || isScreenTime;
-  const hasFooter = isLeetcode || isGfg || (!isAutomated && activity.completion_type === "count");
+  const isAutomated = isGfg || isScreenTime;
+  const hasFooter = isGfg || (!isAutomated && activity.completion_type === "count");
 
   function toggleBoolean() {
     startTransition(async () => {
@@ -98,16 +100,15 @@ export function ActivityRow({
           >
             <ActivityIcon icon={activity.icon} className="mr-1.5 shrink-0" />
             <span className="min-w-0 truncate">{activity.name}</span>
-            {(isLeetcode || isGfg) && (
+            {isGfg && (
               <span className="ml-2 hidden shrink-0 rounded-full border border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-soft lg:inline-block">
-                {isLeetcode ? "LeetCode" : "GFG"}
+                GFG
               </span>
             )}
           </Link>
           {activity.description && (
             <p className="mt-0.5 truncate text-xs text-ink-soft">{activity.description}</p>
           )}
-          {isLeetcode && <p className="mt-0.5 text-xs text-ink-soft">Auto-tracked via LeetCode</p>}
           {isGfg && <p className="mt-0.5 text-xs text-ink-soft">Auto-tracked via GFG</p>}
           {isScreenTime && (
             <p className="mt-0.5 text-xs text-ink-soft">
@@ -125,7 +126,6 @@ export function ActivityRow({
           activity's card doesn't grow an empty strip at lg. */}
       {hasFooter && (
         <div className="contents lg:flex lg:items-center lg:justify-end lg:gap-2 lg:border-t lg:border-line/70 lg:bg-paper/40 lg:px-4 lg:py-2.5">
-          {isLeetcode && <LeetcodeSyncButton activityId={activity.id} compact autoSyncActive={!isDone} />}
           {isGfg && <GfgSyncButton activityId={activity.id} compact autoSyncActive={!isDone} />}
 
           {!isAutomated && activity.completion_type === "count" && (

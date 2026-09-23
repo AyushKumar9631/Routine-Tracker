@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/actions/auth";
 import { NotificationSettingsButton } from "@/components/notification-settings-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const links = [
   { href: "/", label: "Today" },
@@ -16,7 +17,7 @@ export function Nav() {
 
   return (
     <header className="border-b border-line">
-      <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-5">
+      <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-5 lg:max-w-6xl">
         <Link href="/" className="font-display text-xl italic tracking-tight text-ink">
           Routine
         </Link>
@@ -40,6 +41,7 @@ export function Nav() {
             );
           })}
 
+          <ThemeToggle />
           <NotificationSettingsButton />
 
           <form action={signOut}>

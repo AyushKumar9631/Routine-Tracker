@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Nav } from "@/components/nav";
 import { ActivityRow } from "@/components/activity-row";
+import { LeetcodeCard } from "@/components/leetcode-card";
 import { AddActivityDialog } from "@/components/add-activity-dialog";
 import { ScreenTimeTodayCard } from "@/components/screentime-today-card";
 import { StudyTimerCard } from "@/components/study-timer-card";
@@ -103,6 +104,29 @@ export default async function DashboardPage() {
       const list = heatmapByActivity.get(c.activity_id) ?? [];
       list.push(c);
       heatmapByActivity.set(c.activity_id, list);
+    }
+  }
+
+  // LeetCode card (components/leetcode-card.tsx) needs its username and
+  // today's persisted difficulty — neither lives on the activity row itself.
+  const leetcodeConfigByActivity = new Map<
+    string,
+    { leetcode_username: string | null; last_difficulty: string | null }
+  >();
+  const leetcodeDueToday = dueToday.filter((a) => a.automation_type === "leetcode_potd");
+  if (leetcodeDueToday.length > 0) {
+    const { data: leetcodeConfigs } = await supabase
+      .from("leetcode_potd_config")
+      .select("activity_id, leetcode_username, last_difficulty")
+      .in(
+        "activity_id",
+        leetcodeDueToday.map((a) => a.id)
+      );
+    for (const c of leetcodeConfigs ?? []) {
+      leetcodeConfigByActivity.set(c.activity_id, {
+        leetcode_username: c.leetcode_username ?? null,
+        last_difficulty: c.last_difficulty ?? null,
+      });
     }
   }
 
@@ -232,6 +256,41 @@ export default async function DashboardPage() {
     .sort((a, b) => (msUntilDeadline(a, now) ?? Infinity) - (msUntilDeadline(b, now) ?? Infinity));
   const completedToday = dueToday.filter((a) => completionByActivity.get(a.id)?.completed);
 
+  // Routes each due-today activity to its card: LeetCode POTD gets the
+  // themed LeetcodeCard (components/leetcode-card.tsx), everything else
+  // still gets the shared ActivityRow — until each automation type gets its
+  // own redesign in a later turn.
+  function renderActivityCard(activity: Activity) {
+    const completion = completionByActivity.get(activity.id) ?? null;
+    const heatmap = heatmapByActivity.get(activity.id) ?? [];
+
+    if (activity.automation_type === "leetcode_potd") {
+      const config = leetcodeConfigByActivity.get(activity.id);
+      return (
+        <LeetcodeCard
+          key={activity.id}
+          activity={activity}
+          completion={completion}
+          periodKey={key}
+          heatmapCompletions={heatmap}
+          leetcodeUsername={config?.leetcode_username ?? null}
+          difficulty={config?.last_difficulty ?? null}
+        />
+      );
+    }
+
+    return (
+      <ActivityRow
+        key={activity.id}
+        activity={activity}
+        completion={completion}
+        periodKey={key}
+        deadline={deadlineFor(activity, now)?.toISOString() ?? null}
+        heatmapCompletions={heatmap}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <Nav />
@@ -340,16 +399,7 @@ export default async function DashboardPage() {
           />
         ) : (
           <ul className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 xl:grid-cols-3">
-            {uncompletedToday.map((activity) => (
-              <ActivityRow
-                key={activity.id}
-                activity={activity}
-                completion={completionByActivity.get(activity.id) ?? null}
-                periodKey={key}
-                deadline={deadlineFor(activity, now)?.toISOString() ?? null}
-                heatmapCompletions={heatmapByActivity.get(activity.id) ?? []}
-              />
-            ))}
+            {uncompletedToday.map(renderActivityCard)}
           </ul>
         )}
 
@@ -366,15 +416,7 @@ export default async function DashboardPage() {
               <div className="h-px flex-1 bg-line" />
             </div>
             <ul className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 xl:grid-cols-3">
-              {completedToday.map((activity) => (
-                <ActivityRow
-                  key={activity.id}
-                  activity={activity}
-                  completion={completionByActivity.get(activity.id) ?? null}
-                  periodKey={key}
-                  heatmapCompletions={heatmapByActivity.get(activity.id) ?? []}
-                />
-              ))}
+              {completedToday.map(renderActivityCard)}
               {completedStopwatches.map((sw) => (
                 <QuickStopwatchCompletedRow
                   key={sw.id}

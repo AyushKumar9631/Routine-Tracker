@@ -76,7 +76,25 @@
 }
 
 /*
- * Dashboard card interactivity — this turn's PC-only UI pass. Wrapped in the
+ * LeetCode card (components/leetcode-card.tsx) — hover glow in the brand's
+ * signature gold. Kept as its own scoped class rather than composed
+ * Tailwind hover: utilities because the dark-mode glow needs a different
+ * shadow recipe than light mode, not just a different color.
+ */
+.leetcode-card {
+  transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease;
+}
+.leetcode-card:hover {
+  transform: translateY(-4px);
+  border-color: #ffa116;
+  box-shadow: 0 0 0 1px #ffa116, 0 20px 40px -18px rgba(255, 161, 22, 0.45);
+}
+.dark .leetcode-card:hover {
+  box-shadow: 0 0 0 1px #ffa116, 0 20px 45px -16px rgba(255, 161, 22, 0.3), 0 0 32px rgba(255, 161, 22, 0.14);
+}
+
+/*
+ * Dashboard card interactivity (previous turn's PC-only pass). Wrapped in the
  * lg breakpoint's raw media query (rather than Tailwind's lg: variant on
  * each usage) so it stays completely inert below 1024px no matter which
  * component applies these classnames — mobile is untouched by design.

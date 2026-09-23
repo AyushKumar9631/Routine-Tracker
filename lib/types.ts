@@ -45,6 +45,8 @@ export interface LeetCodeConfig {
   last_checked_at: string | null;
   last_synced_date: string | null;
   last_question_slug: string | null;
+  last_difficulty: string | null; // "Easy" | "Medium" | "Hard" of the most recently checked POTD
+  last_title: string | null;
   created_at: string;
   updated_at: string;
 }

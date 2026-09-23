@@ -17,6 +17,8 @@ export async function syncLeetcodeActivity(
   const configUpdate: Record<string, unknown> = {
     last_checked_at: new Date().toISOString(),
     last_question_slug: result.titleSlug,
+    last_difficulty: result.difficulty,
+    last_title: result.title,
   };
   if (result.solved) configUpdate.last_synced_date = result.date;
 
