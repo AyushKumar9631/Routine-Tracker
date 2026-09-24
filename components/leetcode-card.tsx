@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { LeetcodeSyncButton } from "@/components/leetcode-sync-button";
 import type { Activity, Completion } from "@/lib/types";
 import { calcStreak, cn, formatDateKey, isImageIcon, parseDateKey } from "@/lib/utils";
@@ -17,6 +18,7 @@ const DIFFICULTY_COLOR: Record<string, string> = {
 // and selected/premium states. This is the one accent this card borrows
 // everywhere it needs a highlight.
 const ACCENT = "#FFA116";
+const ACCENT_GLOW = "rgba(255, 161, 22, 0.6)";
 
 // LeetCode's own UI isn't set in a custom webfont — it renders in the
 // platform's native system font, so this matches it exactly rather than
@@ -98,8 +100,29 @@ export function LeetcodeCard({
   const days = last14Days(heatmapCompletions, periodKey);
   const difficultyColor = difficulty ? DIFFICULTY_COLOR[difficulty] : null;
 
+  // Replays the tally-strip sweep (app/globals.css) every time the card
+  // scrolls into view, not just once — sweepRun starts at 0 (render the
+  // real state, unanimated, so there's no flash of the wrong state before
+  // JS runs) and bumps on every intersection after that; the days row is
+  // keyed on it so React remounts the boxes and CSS restarts the animation.
+  const cardRef = useRef<HTMLLIElement>(null);
+  const [sweepRun, setSweepRun] = useState(0);
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setSweepRun((n) => n + 1);
+      },
+      { threshold: 0.4 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <li
+      ref={cardRef}
       className={cn(
         "leetcode-card group relative mb-4 overflow-hidden rounded-2xl border p-5 lg:mb-0",
         "border-[#E5E5E5] bg-white text-[#262626]",
@@ -146,17 +169,36 @@ export function LeetcodeCard({
       </div>
 
       <div className="mt-5 flex items-end justify-between gap-4">
-        <div className="flex items-end gap-1">
-          {days.map((d) => (
-            <span
-              key={d.key}
-              title={d.key}
-              className={cn(
-                "h-7 w-2 skew-x-[-12deg] transition-all duration-300",
-                d.done ? "bg-[#FFA116] shadow-[0_0_6px_rgba(255,161,22,0.6)]" : "bg-[#262626]/10 dark:bg-white/10"
-              )}
-            />
-          ))}
+        <div
+          key={sweepRun}
+          className="flex items-end gap-1"
+          style={{ "--tally-accent": ACCENT, "--tally-glow": ACCENT_GLOW } as CSSProperties}
+        >
+          {days.map((d, i) => {
+            const isToday = i === days.length - 1;
+            const stagger = i * 55;
+            const sweepClass =
+              sweepRun === 0 ? null : isToday && !d.done ? "tally-sweep-today" : d.done ? "tally-sweep-fill" : "tally-sweep-empty";
+            return (
+              <span
+                key={d.key}
+                title={d.key}
+                className={cn(
+                  "h-7 w-2 skew-x-[-12deg] text-[#262626]/10 transition-all duration-300 dark:text-white/10",
+                  d.done ? "bg-[#FFA116] shadow-[0_0_6px_rgba(255,161,22,0.6)]" : "bg-current",
+                  sweepClass
+                )}
+                style={
+                  sweepClass
+                    ? {
+                        animationDelay:
+                          isToday && !d.done ? `${stagger}ms, ${stagger + 650}ms` : `${stagger}ms`,
+                      }
+                    : undefined
+                }
+              />
+            );
+          })}
         </div>
 
         <LeetcodeSyncButton

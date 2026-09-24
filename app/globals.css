@@ -111,6 +111,71 @@
 }
 
 /*
+ * Tally-strip reveal (leetcode-card.tsx, gfg-card.tsx). Boxes sweep
+ * left-to-right into a bright glow when the card scrolls into view (driven
+ * by an IntersectionObserver in each component, replayed on every
+ * re-entry), then settle into their real done/not-done state. Today's box,
+ * while still unsolved, keeps blinking after the sweep to flag it as the
+ * one still needing action. Each card sets --tally-accent/--tally-glow
+ * inline so this one keyframe set serves both brand colors.
+ */
+@keyframes tally-sweep-fill {
+  0% {
+    background-color: currentColor;
+    box-shadow: none;
+  }
+  45% {
+    background-color: var(--tally-accent);
+    box-shadow: 0 0 10px var(--tally-glow);
+  }
+  100% {
+    background-color: var(--tally-accent);
+    box-shadow: 0 0 6px var(--tally-glow);
+  }
+}
+@keyframes tally-sweep-empty {
+  0% {
+    background-color: currentColor;
+    box-shadow: none;
+  }
+  45% {
+    background-color: var(--tally-accent);
+    box-shadow: 0 0 10px var(--tally-glow);
+  }
+  100% {
+    background-color: currentColor;
+    box-shadow: none;
+  }
+}
+@keyframes tally-blink {
+  0%,
+  100% {
+    background-color: currentColor;
+    box-shadow: none;
+  }
+  50% {
+    background-color: var(--tally-accent);
+    box-shadow: 0 0 10px var(--tally-glow);
+  }
+}
+.tally-sweep-fill {
+  animation: tally-sweep-fill 650ms ease forwards;
+}
+.tally-sweep-empty {
+  animation: tally-sweep-empty 650ms ease forwards;
+}
+.tally-sweep-today {
+  animation: tally-sweep-empty 650ms ease forwards, tally-blink 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tally-sweep-fill,
+  .tally-sweep-empty,
+  .tally-sweep-today {
+    animation: none !important;
+  }
+}
+
+/*
  * Dashboard card interactivity (previous turn's PC-only pass). Wrapped in the
  * lg breakpoint's raw media query (rather than Tailwind's lg: variant on
  * each usage) so it stays completely inert below 1024px no matter which
