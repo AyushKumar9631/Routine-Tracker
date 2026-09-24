@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Nav } from "@/components/nav";
 import { ActivityRow } from "@/components/activity-row";
 import { LeetcodeCard } from "@/components/leetcode-card";
+import { GfgCard } from "@/components/gfg-card";
 import { AddActivityDialog } from "@/components/add-activity-dialog";
 import { ScreenTimeTodayCard } from "@/components/screentime-today-card";
 import { StudyTimerCard } from "@/components/study-timer-card";
@@ -125,6 +126,29 @@ export default async function DashboardPage() {
     for (const c of leetcodeConfigs ?? []) {
       leetcodeConfigByActivity.set(c.activity_id, {
         leetcode_username: c.leetcode_username ?? null,
+        last_difficulty: c.last_difficulty ?? null,
+      });
+    }
+  }
+
+  // GFG card (components/gfg-card.tsx) needs its username and today's
+  // persisted difficulty — same shape as the LeetCode config just above.
+  const gfgConfigByActivity = new Map<
+    string,
+    { gfg_username: string | null; last_difficulty: string | null }
+  >();
+  const gfgDueToday = dueToday.filter((a) => a.automation_type === "gfg_potd");
+  if (gfgDueToday.length > 0) {
+    const { data: gfgConfigs } = await supabase
+      .from("gfg_potd_config")
+      .select("activity_id, gfg_username, last_difficulty")
+      .in(
+        "activity_id",
+        gfgDueToday.map((a) => a.id)
+      );
+    for (const c of gfgConfigs ?? []) {
+      gfgConfigByActivity.set(c.activity_id, {
+        gfg_username: c.gfg_username ?? null,
         last_difficulty: c.last_difficulty ?? null,
       });
     }
@@ -256,10 +280,11 @@ export default async function DashboardPage() {
     .sort((a, b) => (msUntilDeadline(a, now) ?? Infinity) - (msUntilDeadline(b, now) ?? Infinity));
   const completedToday = dueToday.filter((a) => completionByActivity.get(a.id)?.completed);
 
-  // Routes each due-today activity to its card: LeetCode POTD gets the
-  // themed LeetcodeCard (components/leetcode-card.tsx), everything else
-  // still gets the shared ActivityRow — until each automation type gets its
-  // own redesign in a later turn.
+  // Routes each due-today activity to its card: LeetCode POTD and GFG POTD
+  // get their themed cards (components/leetcode-card.tsx,
+  // components/gfg-card.tsx), everything else still gets the shared
+  // ActivityRow — until each automation type gets its own redesign in a
+  // later turn.
   function renderActivityCard(activity: Activity) {
     const completion = completionByActivity.get(activity.id) ?? null;
     const heatmap = heatmapByActivity.get(activity.id) ?? [];
@@ -274,6 +299,21 @@ export default async function DashboardPage() {
           periodKey={key}
           heatmapCompletions={heatmap}
           leetcodeUsername={config?.leetcode_username ?? null}
+          difficulty={config?.last_difficulty ?? null}
+        />
+      );
+    }
+
+    if (activity.automation_type === "gfg_potd") {
+      const config = gfgConfigByActivity.get(activity.id);
+      return (
+        <GfgCard
+          key={activity.id}
+          activity={activity}
+          completion={completion}
+          periodKey={key}
+          heatmapCompletions={heatmap}
+          gfgUsername={config?.gfg_username ?? null}
           difficulty={config?.last_difficulty ?? null}
         />
       );

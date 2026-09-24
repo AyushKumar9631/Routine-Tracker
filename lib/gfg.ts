@@ -57,3 +57,44 @@ export async function fetchGfgProfile(username: string): Promise<GfgProfileResul
 
   throw new Error(`Couldn't find streak on ${username}'s GFG profile \u2014 markup may have changed`);
 }
+
+// The POTD page (unlike the profile page) needs no username — it's the
+// same problem for every visitor. Same embedded-RSC-JSON technique as
+// fetchGfgProfile above, but the field names below are a best guess from
+// GFG's typical problem-data shape rather than a verified live-page dump:
+// this sandbox has no network access to geeksforgeeks.org to confirm them
+// the way the profile scraper above was confirmed. Never throws — a miss
+// here just means the card shows "Syncing..." instead of a difficulty
+// badge, and never blocks the streak-based solve detection in
+// lib/gfg-sync.ts.
+const POTD_URL = "https://www.geeksforgeeks.org/problem-of-the-day";
+
+export interface GfgPotdInfo {
+  title: string | null;
+  difficulty: string | null;
+}
+
+export async function fetchGfgPotd(): Promise<GfgPotdInfo> {
+  try {
+    const res = await fetch(POTD_URL, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) return { title: null, difficulty: null };
+
+    const html = await res.text();
+
+    const title =
+      html.match(/\\?"problem_name\\?"\s*:\s*\\?"([^"\\]+)\\?"/)?.[1] ??
+      html.match(/\\?"title\\?"\s*:\s*\\?"([^"\\]+)\\?"/)?.[1] ??
+      null;
+    const difficulty = html.match(/\\?"difficulty\\?"\s*:\s*\\?"([^"\\]+)\\?"/)?.[1] ?? null;
+
+    return { title, difficulty };
+  } catch {
+    return { title: null, difficulty: null };
+  }
+}

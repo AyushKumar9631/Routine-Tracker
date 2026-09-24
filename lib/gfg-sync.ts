@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchGfgProfile } from "@/lib/gfg";
+import { fetchGfgProfile, fetchGfgPotd } from "@/lib/gfg";
 
 function todayKeyIst(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
@@ -10,6 +10,8 @@ export interface GfgSyncResult {
   maxStreak: number | null;
   solvedToday: boolean;
   date: string;
+  difficulty: string | null;
+  title: string | null;
 }
 
 /**
@@ -26,13 +28,18 @@ export async function syncGfgActivity(
   gfgUsername: string,
   previousStreak: number | null
 ): Promise<GfgSyncResult> {
-  const { currentStreak, maxStreak } = await fetchGfgProfile(gfgUsername);
+  const [{ currentStreak, maxStreak }, potd] = await Promise.all([
+    fetchGfgProfile(gfgUsername),
+    fetchGfgPotd(),
+  ]);
   const date = todayKeyIst();
   const solvedToday = previousStreak !== null && currentStreak === previousStreak + 1;
 
   const configUpdate: Record<string, unknown> = {
     last_checked_at: new Date().toISOString(),
     last_known_streak: currentStreak,
+    last_difficulty: potd.difficulty,
+    last_title: potd.title,
   };
   if (solvedToday) configUpdate.last_synced_date = date;
 
@@ -54,5 +61,5 @@ export async function syncGfgActivity(
     if (error) throw new Error(error.message);
   }
 
-  return { currentStreak, maxStreak, solvedToday, date };
+  return { currentStreak, maxStreak, solvedToday, date, difficulty: potd.difficulty, title: potd.title };
 }

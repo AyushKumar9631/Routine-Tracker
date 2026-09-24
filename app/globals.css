@@ -94,6 +94,23 @@
 }
 
 /*
+ * GFG card (components/gfg-card.tsx) — same hover-glow treatment as
+ * .leetcode-card above, just GFG's brand green (#0F9D58, Simple Icons
+ * press-kit hex) instead of LeetCode's gold.
+ */
+.gfg-card {
+  transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease;
+}
+.gfg-card:hover {
+  transform: translateY(-4px);
+  border-color: #0f9d58;
+  box-shadow: 0 0 0 1px #0f9d58, 0 20px 40px -18px rgba(15, 157, 88, 0.45);
+}
+.dark .gfg-card:hover {
+  box-shadow: 0 0 0 1px #0f9d58, 0 20px 45px -16px rgba(15, 157, 88, 0.3), 0 0 32px rgba(15, 157, 88, 0.14);
+}
+
+/*
  * Dashboard card interactivity (previous turn's PC-only pass). Wrapped in the
  * lg breakpoint's raw media query (rather than Tailwind's lg: variant on
  * each usage) so it stays completely inert below 1024px no matter which

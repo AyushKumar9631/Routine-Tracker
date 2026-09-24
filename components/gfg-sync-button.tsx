@@ -9,15 +9,21 @@ export function GfgSyncButton({
   activityId,
   compact = false,
   autoSyncActive = false,
+  variant = "default",
+  initialSolved = false,
 }: {
   activityId: string;
   compact?: boolean;
   /** Pass true while today isn't marked solved yet — runs a background poll every ~15s. */
   autoSyncActive?: boolean;
+  /** "gfg" renders as a themed pill (see components/gfg-card.tsx) instead of the generic outline button. */
+  variant?: "default" | "gfg";
+  /** Today's completion state from the server, so the button reflects an already-solved POTD on load. */
+  initialSolved?: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
-  const [solved, setSolved] = useState(false);
+  const [solved, setSolved] = useState(initialSolved);
   const runningRef = useRef(false);
 
   function runSync() {
@@ -69,6 +75,26 @@ export function GfgSyncButton({
   function handleClick() {
     setMessage(null);
     runSync();
+  }
+
+  if (variant === "gfg") {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={isPending}
+        aria-label={solved ? "Today's GFG POTD solved" : "Check today's GFG submission"}
+        className={cn(
+          "shrink-0 rounded-full px-5 py-2 text-xs font-bold uppercase tracking-wide transition-all duration-200",
+          "active:translate-y-0 disabled:opacity-60 disabled:hover:translate-y-0",
+          solved
+            ? "bg-[#0F9D58] text-white shadow-[0_2px_10px_rgba(15,157,88,0.35)] hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_6px_18px_rgba(15,157,88,0.5)]"
+            : "border-2 border-[#0F9D58] bg-transparent text-[#0F9D58] hover:-translate-y-0.5 hover:bg-[#0F9D58]/10"
+        )}
+      >
+        {solved ? "Solved" : isPending ? "Checking\u2026" : "Check"}
+      </button>
+    );
   }
 
   return (
