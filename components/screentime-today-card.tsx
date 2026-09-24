@@ -39,10 +39,16 @@ function TrendBadge({
   const down = pct < 0;
   return (
     <span className={cn("inline-flex items-center gap-1 text-xs font-medium", down ? "text-moss" : "text-rust")}>
-      <span aria-hidden="true">{down ? "\u25be" : "\u25b4"}</span>
+      <span aria-hidden="true">{down ? "▾" : "▴"}</span>
       {Math.abs(pct)}% {down ? "below" : "above"} weekly average
     </span>
   );
+}
+
+interface AppUsageData {
+  app_name: string;
+  duration_minutes: number;
+  percentage: number;
 }
 
 export function ScreenTimeTodayCard({
@@ -51,13 +57,14 @@ export function ScreenTimeTodayCard({
   lastSyncedAt,
   history = [],
   todayDateKey,
+  appUsage = [],
 }: {
   activity: Activity;
   stats: ScreenTimeStats;
   lastSyncedAt: string | null;
-  /** Raw period_key/value history (same rows used for `stats`) — feeds the desktop heat strip. */
   history?: { period_key: string; value: number | null }[];
   todayDateKey: string;
+  appUsage?: AppUsageData[];
 }) {
   const days = recentScreenTimeDays(history, todayDateKey, 14);
   const scale = activity.target_value ? activity.target_value * GAUGE_OVERSHOOT : 240;
@@ -87,8 +94,28 @@ export function ScreenTimeTodayCard({
         </div>
       </div>
 
-      {/* Desktop-only heat strip — a sparkline of bars rather than a square
-          grid, so Screen Time's card reads distinctly from the other cards. */}
+      {/* App-wise breakdown */}
+      {appUsage.length > 0 && (
+        <div className="mt-5 border-t border-line/70 pt-4">
+          <p className="mb-3 text-xs uppercase tracking-wider text-ink-soft">Today's apps</p>
+          <div className="space-y-2">
+            {appUsage.slice(0, 5).map((app) => (
+              <div key={app.app_name} className="flex items-center justify-between text-sm">
+                <span className="text-ink">{app.app_name}</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-ink-soft">{formatScreenTimeLong(app.duration_minutes)}</span>
+                  <span className="w-10 text-right text-xs text-ink-soft">{app.percentage}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {appUsage.length > 5 && (
+            <p className="mt-2 text-xs text-ink-soft">+ {appUsage.length - 5} more apps</p>
+          )}
+        </div>
+      )}
+
+      {/* Desktop-only heat strip */}
       <div className="hidden lg:block lg:mt-5 lg:border-t lg:border-line/70 lg:pt-4">
         <p className="mb-2 text-[11px] uppercase tracking-wider text-ink-soft">Last 14 days</p>
         <div className="flex h-12 items-end gap-1.5">
