@@ -144,14 +144,6 @@ function SegmentedSpeedometer({
                 onMouseLeave={() => setHoveredIndex(null)}
               >
                 <title>{`${Math.round(((i + 1) / 15) * 100)}%`}</title>
-                <animate
-                  attributeName="opacity"
-                  from="0"
-                  to={opacity.toString()}
-                  dur="0.35s"
-                  begin={`${i * 0.04}s`}
-                  fill="freeze"
-                />
               </path>
             </g>
           );
