@@ -408,7 +408,7 @@ export function ScreenTimeTodayCard({
 
   return (
     <div
-      className="screentime-card mb-6 rounded-xl border p-6 transition-all duration-300 lg:col-span-2"
+      className="screentime-card mb-6 rounded-xl border p-6 transition-all duration-300"
       style={{
         backgroundColor: colors.card,
         borderColor: isDark ? "#2C2C2E" : "#E5E5EA",
@@ -427,9 +427,9 @@ export function ScreenTimeTodayCard({
         </span>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[240px_1fr] items-start">
+      <div className="flex flex-col lg:flex-row gap-8">
         {/* Left: Speedometer */}
-        <div className="flex flex-col items-center justify-start pt-4">
+        <div className="flex flex-col items-center justify-start lg:w-64 shrink-0">
           <SegmentedSpeedometer
             minutes={stats.todayMinutes ?? 0}
             limitMinutes={activity.target_value}
@@ -443,7 +443,7 @@ export function ScreenTimeTodayCard({
         </div>
 
         {/* Right: Graph and Analytics */}
-        <div className="flex flex-col space-y-5">
+        <div className="flex-1 flex flex-col space-y-5 min-w-0">
           {/* Analytics above graph */}
           <div className="grid grid-cols-3 gap-6">
             <div className="group cursor-default transition-transform hover:scale-105">
