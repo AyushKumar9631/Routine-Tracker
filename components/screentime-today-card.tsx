@@ -144,14 +144,11 @@ function SegmentedSpeedometer({
       </svg>
 
       {/* Center text */}
-      <div
-        className="absolute inset-0 flex flex-col items-center justify-center"
-        style={{ top: "-15px" }}
-      >
-        <div className="text-4xl font-semibold font-mono" style={{ color: colors.text }}>
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <div className="text-4xl font-semibold font-mono tabular-nums" style={{ color: colors.text }}>
           {formatScreenTimeLong(minutes)}
         </div>
-        <div className="text-xs mt-1" style={{ color: colors.textSoft }}>
+        <div className="text-[10px] mt-1" style={{ color: colors.textSoft }}>
           screen time today
         </div>
       </div>
@@ -430,46 +427,46 @@ export function ScreenTimeTodayCard({
         </span>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
+      <div className="grid gap-8 lg:grid-cols-[240px_1fr] items-start">
         {/* Left: Speedometer */}
-        <div className="flex flex-col items-center justify-center">
+        <div className="flex flex-col items-center justify-start pt-4">
           <SegmentedSpeedometer
             minutes={stats.todayMinutes ?? 0}
             limitMinutes={activity.target_value}
             isDark={isDark}
           />
           {activity.target_value && (
-            <p className="mt-3 text-xs" style={{ color: colors.textSoft }}>
+            <p className="mt-4 text-xs text-center" style={{ color: colors.textSoft }}>
               Daily limit: {formatScreenTimeLong(activity.target_value)}
             </p>
           )}
         </div>
 
         {/* Right: Graph and Analytics */}
-        <div className="flex flex-col space-y-6">
+        <div className="flex flex-col space-y-5">
           {/* Analytics above graph */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-6">
             <div className="group cursor-default transition-transform hover:scale-105">
-              <p className="text-xs mb-1" style={{ color: colors.textSoft }}>
+              <p className="text-[11px] mb-1.5 uppercase tracking-wide" style={{ color: colors.textSoft }}>
                 Weekly Average
               </p>
-              <p className="text-xl font-semibold" style={{ color: colors.text }}>
+              <p className="text-2xl font-semibold tabular-nums" style={{ color: colors.text }}>
                 {formatScreenTimeLong(stats.weeklyAverageMinutes)}
               </p>
             </div>
             <div className="group cursor-default transition-transform hover:scale-105">
-              <p className="text-xs mb-1" style={{ color: colors.textSoft }}>
+              <p className="text-[11px] mb-1.5 uppercase tracking-wide" style={{ color: colors.textSoft }}>
                 Monthly Average
               </p>
-              <p className="text-xl font-semibold" style={{ color: colors.text }}>
+              <p className="text-2xl font-semibold tabular-nums" style={{ color: colors.text }}>
                 {formatScreenTimeLong(stats.monthlyAverageMinutes)}
               </p>
             </div>
             <div className="group cursor-default transition-transform hover:scale-105">
-              <p className="text-xs mb-1" style={{ color: colors.textSoft }}>
+              <p className="text-[11px] mb-1.5 uppercase tracking-wide" style={{ color: colors.textSoft }}>
                 Week Lowest
               </p>
-              <p className="text-xl font-semibold" style={{ color: colors.text }}>
+              <p className="text-2xl font-semibold tabular-nums" style={{ color: colors.text }}>
                 {formatScreenTimeLong(stats.weekLowestMinutes)}
               </p>
             </div>
@@ -478,7 +475,7 @@ export function ScreenTimeTodayCard({
           {/* Line graph */}
           <div>
             <p
-              className="mb-3 text-xs font-medium uppercase tracking-wide"
+              className="mb-3 text-[11px] font-medium uppercase tracking-wider"
               style={{ color: colors.textSoft }}
             >
               Last 14 days
