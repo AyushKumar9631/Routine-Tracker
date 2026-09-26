@@ -132,6 +132,8 @@ function SegmentedSpeedometer({
                 d={createSegmentPath(segmentStart, segmentEnd)}
                 fill={fillColor}
                 opacity={opacity}
+                stroke={isDark ? "#2C2C2E" : "#E5E5EA"}
+                strokeWidth="0.5"
                 className={cn(
                   "transition-all duration-300 cursor-pointer",
                   shouldBlink && "animate-pulse"
@@ -144,6 +146,14 @@ function SegmentedSpeedometer({
                 onMouseLeave={() => setHoveredIndex(null)}
               >
                 <title>{`${Math.round(((i + 1) / 15) * 100)}%`}</title>
+                <animate
+                  attributeName="opacity"
+                  from="0"
+                  to={opacity.toString()}
+                  dur="0.35s"
+                  begin={`${i * 0.04}s`}
+                  fill="freeze"
+                />
               </path>
             </g>
           );
