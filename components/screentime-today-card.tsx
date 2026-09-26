@@ -108,17 +108,21 @@ function SegmentedSpeedometer({
 
           let fillColor = colors.card;
           let opacity = 0.3;
+          let strokeColor = isDark ? "#3C3C3E" : "#D5D5DA";
 
           if (i < filledBoxes) {
             if (i < 5) {
               fillColor = colors.cyan;
               opacity = 1;
+              strokeColor = colors.cyan;
             } else if (i < 10) {
               fillColor = colors.blue;
               opacity = 1;
+              strokeColor = colors.blue;
             } else {
               fillColor = colors.orange;
               opacity = 1;
+              strokeColor = colors.orange;
             }
           }
 
@@ -131,9 +135,8 @@ function SegmentedSpeedometer({
               <path
                 d={createSegmentPath(segmentStart, segmentEnd)}
                 fill={fillColor}
-                opacity={opacity}
-                stroke={isDark ? "#2C2C2E" : "#E5E5EA"}
-                strokeWidth="0.5"
+                stroke={strokeColor}
+                strokeWidth="1"
                 className={cn(
                   "transition-all duration-300 cursor-pointer",
                   shouldBlink && "animate-pulse"
@@ -141,19 +144,13 @@ function SegmentedSpeedometer({
                 style={{
                   transformOrigin: `${CX}px ${CY}px`,
                   transform: isHovered ? "scale(1.05)" : "scale(1)",
+                  opacity: 0,
+                  animation: `fadeIn 0.35s ease-out ${i * 0.04}s forwards`,
                 }}
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}
               >
                 <title>{`${Math.round(((i + 1) / 15) * 100)}%`}</title>
-                <animate
-                  attributeName="opacity"
-                  from="0"
-                  to={opacity.toString()}
-                  dur="0.35s"
-                  begin={`${i * 0.04}s`}
-                  fill="freeze"
-                />
               </path>
             </g>
           );
