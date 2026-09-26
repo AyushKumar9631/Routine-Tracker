@@ -133,13 +133,13 @@ function SegmentedSpeedometer({
                 fill={fillColor}
                 opacity={opacity}
                 className={cn(
-                  "transition-all duration-300 cursor-pointer animate-heat-pop",
+                  "transition-all duration-300 cursor-pointer",
                   shouldBlink && "animate-pulse"
                 )}
                 style={{
                   transformOrigin: `${CX}px ${CY}px`,
                   transform: isHovered ? "scale(1.05)" : "scale(1)",
-                  animationDelay: `${i * 40}ms`,
+                  animation: `heat-pop 0.35s ease-out backwards ${i * 40}ms`,
                 }}
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}
@@ -239,15 +239,14 @@ function LineGraph({
     });
 
     if (closestIndex >= 0 && days[closestIndex].minutes !== null) {
-      const validMinutes = days.map((d) => d.minutes).filter((m): m is number => m !== null);
-      const maxMinutes = Math.max(...validMinutes, limitMinutes || 0);
+      const stepX = graphWidth / (days.length - 1);
       const dayX = padding + closestIndex * stepX;
       const canvasRect = canvas.getBoundingClientRect();
 
       setHoveredDay({
         index: closestIndex,
         x: canvasRect.left + dayX,
-        y: canvasRect.top,
+        y: canvasRect.top - 15,
         minutes: days[closestIndex].minutes!,
       });
     } else {
