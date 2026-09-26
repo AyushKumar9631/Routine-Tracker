@@ -280,31 +280,15 @@ function LineGraph({
 
     const maxMinutes = Math.max(...validMinutes, limitMinutes || 0);
     const avgMinutes = validMinutes.reduce((sum, m) => sum + m, 0) / validMinutes.length;
+    const minMinutes = Math.min(...validMinutes);
     const stepX = graphWidth / (days.length - 1);
 
-    // Y-axis labels (max and 0)
-    ctx.fillStyle = `${colors.textSoft}80`;
-    ctx.font = "9px sans-serif";
+    // Y-axis labels (max and min) - more visible
+    ctx.fillStyle = colors.textSoft;
+    ctx.font = "bold 10px sans-serif";
     ctx.textAlign = "right";
     ctx.fillText(formatScreenTimeLong(maxMinutes), width - 5, padding + 10);
-    ctx.fillText("0m", width - 5, padding + graphHeight);
-
-    // Average line
-    const avgY = padding + graphHeight - (avgMinutes / maxMinutes) * graphHeight;
-    ctx.beginPath();
-    ctx.moveTo(padding, avgY);
-    ctx.lineTo(padding + graphWidth, avgY);
-    ctx.strokeStyle = `${colors.textSoft}40`;
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4, 4]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Average label
-    ctx.fillStyle = `${colors.textSoft}60`;
-    ctx.font = "9px sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(`avg ${formatScreenTimeLong(avgMinutes)}`, padding + 5, avgY - 5);
+    ctx.fillText(formatScreenTimeLong(minMinutes), width - 5, padding + graphHeight);
 
     const points: { x: number; y: number; minutes: number; color: string }[] = [];
     days.forEach((day, i) => {
@@ -406,8 +390,8 @@ function LineGraph({
             backgroundColor: colors.card,
             color: colors.text,
             border: `1px solid ${isDark ? "#2C2C2E" : "#E5E5EA"}`,
-            left: mousePos.x + 10,
-            top: mousePos.y - 30,
+            left: mousePos.x - 35,
+            top: mousePos.y - 45,
           }}
         >
           {formatScreenTimeLong(hoveredDay.minutes)}
