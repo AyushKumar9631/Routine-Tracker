@@ -40,7 +40,7 @@ const SCREENTIME_COLORS = {
   },
 };
 
-function SegmentedProgress({
+function SegmentedSpeedometer({
   minutes,
   limitMinutes,
   isDark,
@@ -55,49 +55,106 @@ function SegmentedProgress({
   const filledBoxes = Math.floor((percentage / 100) * 15);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
+  const CX = 100;
+  const CY = 100;
+  const R = 78;
+  const START_ANGLE = 135;
+  const SWEEP = 270;
+  const SEGMENT_COUNT = 15;
+  const SEGMENT_ANGLE = SWEEP / SEGMENT_COUNT;
+  const GAP = 3; // Gap between segments in degrees
+
+  const polarToCartesian = (angle: number, radius: number) => {
+    const rad = (angle * Math.PI) / 180;
+    return {
+      x: CX + radius * Math.cos(rad),
+      y: CY + radius * Math.sin(rad),
+    };
+  };
+
+  const createSegmentPath = (startAngle: number, endAngle: number) => {
+    const innerRadius = R - 6;
+    const outerRadius = R + 6;
+
+    const start1 = polarToCartesian(startAngle, innerRadius);
+    const end1 = polarToCartesian(endAngle, innerRadius);
+    const start2 = polarToCartesian(startAngle, outerRadius);
+    const end2 = polarToCartesian(endAngle, outerRadius);
+
+    return `
+      M ${start1.x} ${start1.y}
+      A ${innerRadius} ${innerRadius} 0 0 1 ${end1.x} ${end1.y}
+      L ${end2.x} ${end2.y}
+      A ${outerRadius} ${outerRadius} 0 0 0 ${start2.x} ${start2.y}
+      Z
+    `;
+  };
+
   return (
-    <div className="flex gap-1">
-      {Array.from({ length: 15 }).map((_, i) => {
-        let bgColor = colors.card;
-        let opacity = "0.3";
+    <div className="relative w-full max-w-[200px] mx-auto">
+      <svg viewBox="0 0 200 170" className="w-full" aria-hidden="true">
+        {Array.from({ length: SEGMENT_COUNT }).map((_, i) => {
+          const segmentStart = START_ANGLE + i * SEGMENT_ANGLE + (i > 0 ? GAP / 2 : 0);
+          const segmentEnd = START_ANGLE + (i + 1) * SEGMENT_ANGLE - GAP / 2;
 
-        if (i < filledBoxes) {
-          if (i < 5) {
-            bgColor = colors.cyan;
-            opacity = "1";
-          } else if (i < 10) {
-            bgColor = colors.blue;
-            opacity = "1";
-          } else {
-            bgColor = colors.orange;
-            opacity = "1";
+          let fillColor = colors.card;
+          let opacity = 0.3;
+
+          if (i < filledBoxes) {
+            if (i < 5) {
+              fillColor = colors.cyan;
+              opacity = 1;
+            } else if (i < 10) {
+              fillColor = colors.blue;
+              opacity = 1;
+            } else {
+              fillColor = colors.orange;
+              opacity = 1;
+            }
           }
-        }
 
-        // Last box blinks if not filled
-        const isLastBox = i === 14;
-        const shouldBlink = isLastBox && i >= filledBoxes;
-        const isHovered = hoveredIndex === i;
-        const boxMinutes = Math.round((limit / 15) * (i + 1));
+          const isLastBox = i === 14;
+          const shouldBlink = isLastBox && i >= filledBoxes;
+          const isHovered = hoveredIndex === i;
 
-        return (
-          <div
-            key={i}
-            className={cn(
-              "h-2 flex-1 rounded-sm transition-all duration-300 cursor-pointer relative group",
-              shouldBlink && "animate-pulse",
-              isHovered && "scale-125 -translate-y-0.5"
-            )}
-            style={{
-              backgroundColor: bgColor,
-              opacity: i < filledBoxes ? opacity : "0.3",
-            }}
-            onMouseEnter={() => setHoveredIndex(i)}
-            onMouseLeave={() => setHoveredIndex(null)}
-            title={`${Math.round((i / 15) * 100)}% - ${formatScreenTimeLong(boxMinutes)}`}
-          />
-        );
-      })}
+          return (
+            <g key={i}>
+              <path
+                d={createSegmentPath(segmentStart, segmentEnd)}
+                fill={fillColor}
+                opacity={opacity}
+                className={cn(
+                  "transition-all duration-300 cursor-pointer",
+                  shouldBlink && "animate-pulse",
+                  isHovered && "scale-105"
+                )}
+                style={{
+                  transformOrigin: `${CX}px ${CY}px`,
+                }}
+                onMouseEnter={() => setHoveredIndex(i)}
+                onMouseLeave={() => setHoveredIndex(null)}
+              >
+                <title>{`${Math.round((i / 15) * 100)}% - ${formatScreenTimeLong(
+                  Math.round((limit / 15) * (i + 1))
+                )}`}</title>
+              </path>
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Center text */}
+      <div
+        className="absolute inset-0 flex flex-col items-center justify-center"
+        style={{ top: "-15px" }}
+      >
+        <div className="text-4xl font-semibold font-mono" style={{ color: colors.text }}>
+          {formatScreenTimeLong(minutes)}
+        </div>
+        <div className="text-xs mt-1" style={{ color: colors.textSoft }}>
+          screen time today
+        </div>
+      </div>
     </div>
   );
 }
@@ -354,17 +411,17 @@ export function ScreenTimeTodayCard({
 
   return (
     <div
-      className="screentime-card mb-6 rounded-xl border p-6 transition-all duration-300"
+      className="screentime-card mb-6 rounded-xl border p-6 transition-all duration-300 lg:col-span-2"
       style={{
         backgroundColor: colors.card,
         borderColor: isDark ? "#2C2C2E" : "#E5E5EA",
       }}
     >
       {/* Header */}
-      <div className="mb-5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ActivityIcon icon={activity.icon} className="text-lg" />
-          <span className="text-sm font-medium" style={{ color: colors.text }}>
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <ActivityIcon icon={activity.icon} className="text-xl" />
+          <span className="text-base font-medium" style={{ color: colors.text }}>
             {activity.name}
           </span>
         </div>
@@ -373,65 +430,60 @@ export function ScreenTimeTodayCard({
         </span>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_200px]">
-        {/* Left: Graph section */}
-        <div className="space-y-4">
-          {/* Segmented progress */}
-          <div>
-            <div className="mb-2 flex items-end justify-between">
-              <span className="text-2xl font-semibold" style={{ color: colors.text }}>
-                {formatScreenTimeLong(stats.todayMinutes)}
-              </span>
-              {activity.target_value && (
-                <span className="text-xs" style={{ color: colors.textSoft }}>
-                  of {formatScreenTimeLong(activity.target_value)}
-                </span>
-              )}
+      <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
+        {/* Left: Speedometer */}
+        <div className="flex flex-col items-center justify-center">
+          <SegmentedSpeedometer
+            minutes={stats.todayMinutes ?? 0}
+            limitMinutes={activity.target_value}
+            isDark={isDark}
+          />
+          {activity.target_value && (
+            <p className="mt-3 text-xs" style={{ color: colors.textSoft }}>
+              Daily limit: {formatScreenTimeLong(activity.target_value)}
+            </p>
+          )}
+        </div>
+
+        {/* Right: Graph and Analytics */}
+        <div className="flex flex-col space-y-6">
+          {/* Analytics above graph */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="group cursor-default transition-transform hover:scale-105">
+              <p className="text-xs mb-1" style={{ color: colors.textSoft }}>
+                Weekly Average
+              </p>
+              <p className="text-xl font-semibold" style={{ color: colors.text }}>
+                {formatScreenTimeLong(stats.weeklyAverageMinutes)}
+              </p>
             </div>
-            <SegmentedProgress
-              minutes={stats.todayMinutes ?? 0}
-              limitMinutes={activity.target_value}
-              isDark={isDark}
-            />
+            <div className="group cursor-default transition-transform hover:scale-105">
+              <p className="text-xs mb-1" style={{ color: colors.textSoft }}>
+                Monthly Average
+              </p>
+              <p className="text-xl font-semibold" style={{ color: colors.text }}>
+                {formatScreenTimeLong(stats.monthlyAverageMinutes)}
+              </p>
+            </div>
+            <div className="group cursor-default transition-transform hover:scale-105">
+              <p className="text-xs mb-1" style={{ color: colors.textSoft }}>
+                Week Lowest
+              </p>
+              <p className="text-xl font-semibold" style={{ color: colors.text }}>
+                {formatScreenTimeLong(stats.weekLowestMinutes)}
+              </p>
+            </div>
           </div>
 
           {/* Line graph */}
           <div>
             <p
-              className="mb-2 text-xs font-medium uppercase tracking-wide"
+              className="mb-3 text-xs font-medium uppercase tracking-wide"
               style={{ color: colors.textSoft }}
             >
               Last 14 days
             </p>
             <LineGraph days={last14Days} limitMinutes={activity.target_value} isDark={isDark} />
-          </div>
-        </div>
-
-        {/* Right: Analytics */}
-        <div className="flex flex-col justify-center space-y-3">
-          <div className="group cursor-default transition-transform hover:scale-105">
-            <p className="text-xs transition-colors" style={{ color: colors.textSoft }}>
-              Weekly Average
-            </p>
-            <p className="text-lg font-semibold transition-all" style={{ color: colors.text }}>
-              {formatScreenTimeLong(stats.weeklyAverageMinutes)}
-            </p>
-          </div>
-          <div className="group cursor-default transition-transform hover:scale-105">
-            <p className="text-xs transition-colors" style={{ color: colors.textSoft }}>
-              Monthly Average
-            </p>
-            <p className="text-lg font-semibold transition-all" style={{ color: colors.text }}>
-              {formatScreenTimeLong(stats.monthlyAverageMinutes)}
-            </p>
-          </div>
-          <div className="group cursor-default transition-transform hover:scale-105">
-            <p className="text-xs transition-colors" style={{ color: colors.textSoft }}>
-              Week Lowest
-            </p>
-            <p className="text-lg font-semibold transition-all" style={{ color: colors.text }}>
-              {formatScreenTimeLong(stats.weekLowestMinutes)}
-            </p>
           </div>
         </div>
       </div>
