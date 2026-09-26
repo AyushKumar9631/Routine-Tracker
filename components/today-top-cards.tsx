@@ -47,9 +47,9 @@ export function TodayTopCards({ items }: { items: { id: string; node: React.Reac
       // Each card still carries its own mb-6 for the (unchanged) mobile
       // single-card layout — canceled here since the grid's own gap handles
       // spacing between cards instead.
-      <div className="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-3 [&_.card-interactive]:!mb-0">
+      <div className="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-3 [&_.card-interactive]:!mb-0 [&_.screentime-card]:!mb-0">
         {items.map((item) => (
-          <div key={item.id}>{item.node}</div>
+          <div key={item.id} className={item.id === 'screen-time' ? 'col-span-2' : ''}>{item.node}</div>
         ))}
       </div>
     );
