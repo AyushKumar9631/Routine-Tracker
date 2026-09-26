@@ -18,7 +18,6 @@ interface DayPoint {
   minutes: number | null;
 }
 
-// iPhone Screen Time colors
 const SCREENTIME_COLORS = {
   light: {
     background: "#FFFFFF",
@@ -39,6 +38,14 @@ const SCREENTIME_COLORS = {
     orange: "#FF9F0A",
   },
 };
+
+function formatTimeCompact(minutes: number | null | undefined): { hours: string; mins: string } {
+  if (minutes == null || !Number.isFinite(minutes)) return { hours: "--", mins: "--" };
+  const total = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  return { hours: `${hours}hr`, mins: `${mins} mins` };
+}
 
 function SegmentedSpeedometer({
   minutes,
@@ -90,6 +97,8 @@ function SegmentedSpeedometer({
     `;
   };
 
+  const time = formatTimeCompact(minutes);
+
   return (
     <div className="relative w-full max-w-[200px]">
       <svg viewBox="0 0 200 180" className="w-full" aria-hidden="true">
@@ -134,32 +143,43 @@ function SegmentedSpeedometer({
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}
               >
-                <title>{`${Math.round(((i + 1) / 15) * 100)}% - ${formatScreenTimeLong(
-                  Math.round((limit / 15) * (i + 1))
-                )}`}</title>
+                <title>{`${Math.round(((i + 1) / 15) * 100)}%`}</title>
               </path>
             </g>
           );
         })}
 
-        {/* Center text inside SVG */}
         <text
           x={CX}
-          y={CY - 8}
+          y={CY - 12}
           textAnchor="middle"
           dominantBaseline="middle"
           className="font-mono font-semibold"
           style={{
-            fontSize: "32px",
+            fontSize: "28px",
             fill: colors.text,
             fontVariantNumeric: "tabular-nums"
           }}
         >
-          {formatScreenTimeLong(minutes)}
+          {time.hours}
         </text>
         <text
           x={CX}
-          y={CY + 18}
+          y={CY + 8}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className="font-mono font-semibold"
+          style={{
+            fontSize: "28px",
+            fill: colors.text,
+            fontVariantNumeric: "tabular-nums"
+          }}
+        >
+          {time.mins}
+        </text>
+        <text
+          x={CX}
+          y={CY + 28}
           textAnchor="middle"
           dominantBaseline="middle"
           style={{
@@ -259,7 +279,32 @@ function LineGraph({
     if (validMinutes.length === 0) return;
 
     const maxMinutes = Math.max(...validMinutes, limitMinutes || 0);
+    const avgMinutes = validMinutes.reduce((sum, m) => sum + m, 0) / validMinutes.length;
     const stepX = graphWidth / (days.length - 1);
+
+    // Y-axis labels (max and 0)
+    ctx.fillStyle = `${colors.textSoft}80`;
+    ctx.font = "9px sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(formatScreenTimeLong(maxMinutes), width - 5, padding + 10);
+    ctx.fillText("0m", width - 5, padding + graphHeight);
+
+    // Average line
+    const avgY = padding + graphHeight - (avgMinutes / maxMinutes) * graphHeight;
+    ctx.beginPath();
+    ctx.moveTo(padding, avgY);
+    ctx.lineTo(padding + graphWidth, avgY);
+    ctx.strokeStyle = `${colors.textSoft}40`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Average label
+    ctx.fillStyle = `${colors.textSoft}60`;
+    ctx.font = "9px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(`avg ${formatScreenTimeLong(avgMinutes)}`, padding + 5, avgY - 5);
 
     const points: { x: number; y: number; minutes: number; color: string }[] = [];
     days.forEach((day, i) => {
@@ -350,7 +395,7 @@ function LineGraph({
     <div className="relative">
       <canvas
         ref={canvasRef}
-        className="w-full h-32 cursor-crosshair"
+        className="w-full h-32 cursor-pointer"
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoveredDay(null)}
       />
@@ -365,7 +410,7 @@ function LineGraph({
             top: mousePos.y - 30,
           }}
         >
-          {days[hoveredDay.index].key}: {formatScreenTimeLong(hoveredDay.minutes)}
+          {formatScreenTimeLong(hoveredDay.minutes)}
         </div>
       )}
     </div>
@@ -414,6 +459,10 @@ export function ScreenTimeTodayCard({
     last14Days.push({ key, minutes: entry?.value ?? null });
   }
 
+  const weeklyTime = formatTimeCompact(stats.weeklyAverageMinutes);
+  const monthlyTime = formatTimeCompact(stats.monthlyAverageMinutes);
+  const lowestTime = formatTimeCompact(stats.weekLowestMinutes);
+
   return (
     <div
       className="screentime-card mb-6 rounded-xl border p-6 transition-all duration-300 lg:col-span-2 xl:col-span-2"
@@ -422,7 +471,6 @@ export function ScreenTimeTodayCard({
         borderColor: isDark ? "#2C2C2E" : "#E5E5EA",
       }}
     >
-      {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <ActivityIcon icon={activity.icon} className="text-xl" />
@@ -436,7 +484,6 @@ export function ScreenTimeTodayCard({
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Left: Speedometer */}
         <div className="flex flex-col items-center justify-start shrink-0">
           <SegmentedSpeedometer
             minutes={stats.todayMinutes ?? 0}
@@ -450,37 +497,43 @@ export function ScreenTimeTodayCard({
           )}
         </div>
 
-        {/* Right: Graph and Analytics */}
         <div className="flex-1 flex flex-col space-y-5 min-w-0">
-          {/* Analytics above graph */}
           <div className="grid grid-cols-3 gap-6">
             <div className="group cursor-default transition-transform hover:scale-105">
               <p className="text-[11px] mb-1.5 uppercase tracking-wide" style={{ color: colors.textSoft }}>
                 Weekly Average
               </p>
-              <p className="text-2xl font-semibold tabular-nums" style={{ color: colors.text }}>
-                {formatScreenTimeLong(stats.weeklyAverageMinutes)}
+              <p className="text-xl font-semibold tabular-nums leading-tight" style={{ color: colors.text }}>
+                {weeklyTime.hours}
+              </p>
+              <p className="text-xl font-semibold tabular-nums leading-tight" style={{ color: colors.text }}>
+                {weeklyTime.mins}
               </p>
             </div>
             <div className="group cursor-default transition-transform hover:scale-105">
               <p className="text-[11px] mb-1.5 uppercase tracking-wide" style={{ color: colors.textSoft }}>
                 Monthly Average
               </p>
-              <p className="text-2xl font-semibold tabular-nums" style={{ color: colors.text }}>
-                {formatScreenTimeLong(stats.monthlyAverageMinutes)}
+              <p className="text-xl font-semibold tabular-nums leading-tight" style={{ color: colors.text }}>
+                {monthlyTime.hours}
+              </p>
+              <p className="text-xl font-semibold tabular-nums leading-tight" style={{ color: colors.text }}>
+                {monthlyTime.mins}
               </p>
             </div>
             <div className="group cursor-default transition-transform hover:scale-105">
               <p className="text-[11px] mb-1.5 uppercase tracking-wide" style={{ color: colors.textSoft }}>
                 Week Lowest
               </p>
-              <p className="text-2xl font-semibold tabular-nums" style={{ color: colors.text }}>
-                {formatScreenTimeLong(stats.weekLowestMinutes)}
+              <p className="text-xl font-semibold tabular-nums leading-tight" style={{ color: colors.text }}>
+                {lowestTime.hours}
+              </p>
+              <p className="text-xl font-semibold tabular-nums leading-tight" style={{ color: colors.text }}>
+                {lowestTime.mins}
               </p>
             </div>
           </div>
 
-          {/* Line graph */}
           <div>
             <p
               className="mb-3 text-[11px] font-medium uppercase tracking-wider"
