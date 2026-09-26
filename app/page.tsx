@@ -157,7 +157,6 @@ export default async function DashboardPage() {
   let screenTimeStats = null;
   let screenTimeHistory: { period_key: string; value: number | null }[] = [];
   let screenTimeLastSyncedAt: string | null = null;
-  let appUsageToday: { app_name: string; duration_minutes: number; percentage: number }[] = [];
   if (screenTimeActivity) {
     const { data } = await supabase
       .from("completions")
@@ -174,23 +173,6 @@ export default async function DashboardPage() {
       .eq("activity_id", screenTimeActivity.id)
       .maybeSingle();
     screenTimeLastSyncedAt = config?.last_synced_at ?? null;
-
-    // Fetch today's app-wise usage
-    const { data: appUsageData } = await supabase
-      .from("app_usage")
-      .select("app_name, duration_minutes")
-      .eq("date_key", key)
-      .not("duration_minutes", "is", null)
-      .order("duration_minutes", { ascending: false });
-
-    if (appUsageData && appUsageData.length > 0) {
-      const totalMinutes = appUsageData.reduce((sum, app) => sum + (app.duration_minutes ?? 0), 0);
-      appUsageToday = appUsageData.map((app) => ({
-        app_name: app.app_name,
-        duration_minutes: app.duration_minutes ?? 0,
-        percentage: totalMinutes > 0 ? Math.round(((app.duration_minutes ?? 0) / totalMinutes) * 100) : 0,
-      }));
-    }
   }
 
   let studyTimerConfig: StudyTimerConfig | null = null;
@@ -387,7 +369,6 @@ export default async function DashboardPage() {
                         lastSyncedAt={screenTimeLastSyncedAt}
                         history={screenTimeHistory}
                         todayDateKey={key}
-                        appUsage={appUsageToday}
                       />
                     ),
                   },
