@@ -103,6 +103,33 @@
 }
 .gfg-card:hover {
   transform: translateY(-4px);
+  border-color: #0F9D58;
+  box-shadow: 0 0 0 1px #0F9D58, 0 20px 40px -18px rgba(15, 157, 88, 0.45);
+}
+.dark .gfg-card:hover {
+  box-shadow: 0 0 0 1px #0F9D58, 0 20px 45px -16px rgba(15, 157, 88, 0.3), 0 0 32px rgba(15, 157, 88, 0.14);
+}
+
+/*
+ * Screen Time card (components/screentime-today-card.tsx) — iPhone-inspired
+ * subtle hover lift without the brand glow (Screen Time is a native iOS feature,
+ * not a third-party service).
+ */
+.screentime-card {
+  transition: transform 300ms ease, box-shadow 300ms ease;
+}
+.screentime-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.12);
+}
+.dark .screentime-card:hover {
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
+}
+.gfg-card {
+  transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease;
+}
+.gfg-card:hover {
+  transform: translateY(-4px);
   border-color: #0f9d58;
   box-shadow: 0 0 0 1px #0f9d58, 0 20px 40px -18px rgba(15, 157, 88, 0.45);
 }

@@ -1,54 +1,312 @@
+"use client";
+
 import { ActivityIcon } from "@/components/activity-icon";
-import { ScreenTimeGauge } from "@/components/screentime-gauge";
-import {
-  GAUGE_OVERSHOOT,
-  formatScreenTimeLong,
-  recentScreenTimeDays,
-  screenTimeLevel,
-  type ScreenTimeLevel,
-  type ScreenTimeStats,
-} from "@/lib/screentime";
+import { formatScreenTimeLong } from "@/lib/screentime";
 import type { Activity } from "@/lib/types";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import { useEffect, useRef, useState } from "react";
 
-const LEVEL_BAR: Record<ScreenTimeLevel, string> = {
-  moss: "bg-moss",
-  amber: "bg-amber",
-  rust: "bg-rust",
+interface ScreenTimeStats {
+  todayMinutes: number | null;
+  weeklyAverageMinutes: number | null;
+  monthlyAverageMinutes: number | null;
+  weekLowestMinutes: number | null;
+}
+
+interface DayPoint {
+  key: string;
+  minutes: number | null;
+}
+
+// iPhone Screen Time colors
+const SCREENTIME_COLORS = {
+  light: {
+    background: "#FFFFFF",
+    card: "#F2F2F7",
+    text: "#000000",
+    textSoft: "#8E8E93",
+    cyan: "#32ADE6",
+    blue: "#007AFF",
+    orange: "#FF9500",
+  },
+  dark: {
+    background: "#000000",
+    card: "#1C1C1E",
+    text: "#FFFFFF",
+    textSoft: "#8E8E93",
+    cyan: "#64D2FF",
+    blue: "#0A84FF",
+    orange: "#FF9F0A",
+  },
 };
 
-function StatRow({ label, value }: { label: string; value: string }) {
+function SegmentedProgress({
+  minutes,
+  limitMinutes,
+  isDark,
+}: {
+  minutes: number;
+  limitMinutes: number | null;
+  isDark: boolean;
+}) {
+  const colors = isDark ? SCREENTIME_COLORS.dark : SCREENTIME_COLORS.light;
+  const limit = limitMinutes || 240; // Default 4 hours
+  const percentage = Math.min((minutes / limit) * 100, 100);
+  const filledBoxes = Math.floor((percentage / 100) * 15);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
   return (
-    <div className="flex items-center justify-between py-2 text-sm">
-      <span className="text-ink-soft">{label}</span>
-      <span className="font-mono text-ink">{value}</span>
+    <div className="flex gap-1">
+      {Array.from({ length: 15 }).map((_, i) => {
+        let bgColor = colors.card;
+        let opacity = "0.3";
+
+        if (i < filledBoxes) {
+          if (i < 5) {
+            bgColor = colors.cyan;
+            opacity = "1";
+          } else if (i < 10) {
+            bgColor = colors.blue;
+            opacity = "1";
+          } else {
+            bgColor = colors.orange;
+            opacity = "1";
+          }
+        }
+
+        // Last box blinks if not filled
+        const isLastBox = i === 14;
+        const shouldBlink = isLastBox && i >= filledBoxes;
+        const isHovered = hoveredIndex === i;
+        const boxMinutes = Math.round((limit / 15) * (i + 1));
+
+        return (
+          <div
+            key={i}
+            className={cn(
+              "h-2 flex-1 rounded-sm transition-all duration-300 cursor-pointer relative group",
+              shouldBlink && "animate-pulse",
+              isHovered && "scale-125 -translate-y-0.5"
+            )}
+            style={{
+              backgroundColor: bgColor,
+              opacity: i < filledBoxes ? opacity : "0.3",
+            }}
+            onMouseEnter={() => setHoveredIndex(i)}
+            onMouseLeave={() => setHoveredIndex(null)}
+            title={`${Math.round((i / 15) * 100)}% - ${formatScreenTimeLong(boxMinutes)}`}
+          />
+        );
+      })}
     </div>
   );
 }
 
-function TrendBadge({
-  todayMinutes,
-  weeklyAverageMinutes,
+function LineGraph({
+  days,
+  limitMinutes,
+  isDark,
 }: {
-  todayMinutes: number | null;
-  weeklyAverageMinutes: number | null;
+  days: DayPoint[];
+  limitMinutes: number | null;
+  isDark: boolean;
 }) {
-  if (todayMinutes == null || !weeklyAverageMinutes) return null;
-  const pct = Math.round(((todayMinutes - weeklyAverageMinutes) / weeklyAverageMinutes) * 100);
-  if (pct === 0) return <span className="text-xs text-ink-soft">On par with your weekly average</span>;
-  const down = pct < 0;
-  return (
-    <span className={cn("inline-flex items-center gap-1 text-xs font-medium", down ? "text-moss" : "text-rust")}>
-      <span aria-hidden="true">{down ? "▾" : "▴"}</span>
-      {Math.abs(pct)}% {down ? "below" : "above"} weekly average
-    </span>
-  );
-}
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [hoveredDay, setHoveredDay] = useState<{ index: number; x: number; y: number; minutes: number } | null>(null);
+  const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const colors = isDark ? SCREENTIME_COLORS.dark : SCREENTIME_COLORS.light;
 
-interface AppUsageData {
-  app_name: string;
-  duration_minutes: number;
-  percentage: number;
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setMousePos({ x: e.clientX, y: e.clientY });
+
+    const width = rect.width;
+    const padding = 10;
+    const graphWidth = width - padding * 2;
+    const stepX = graphWidth / (days.length - 1);
+
+    // Find closest day
+    let closestIndex = -1;
+    let closestDist = Infinity;
+
+    days.forEach((day, i) => {
+      if (day.minutes !== null) {
+        const dayX = padding + i * stepX;
+        const dist = Math.abs(x - dayX);
+        if (dist < closestDist && dist < 20) {
+          closestDist = dist;
+          closestIndex = i;
+        }
+      }
+    });
+
+    if (closestIndex >= 0 && days[closestIndex].minutes !== null) {
+      const validMinutes = days.map((d) => d.minutes).filter((m): m is number => m !== null);
+      const maxMinutes = Math.max(...validMinutes, limitMinutes || 0);
+      const graphHeight = rect.height - padding * 2;
+      const dayX = padding + closestIndex * stepX;
+      const dayY = padding + graphHeight - (days[closestIndex].minutes! / maxMinutes) * graphHeight;
+
+      setHoveredDay({
+        index: closestIndex,
+        x: dayX,
+        y: dayY,
+        minutes: days[closestIndex].minutes!,
+      });
+    } else {
+      setHoveredDay(null);
+    }
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const width = rect.width;
+    const height = rect.height;
+    const padding = 10;
+    const graphWidth = width - padding * 2;
+    const graphHeight = height - padding * 2;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Find max value for scaling
+    const validMinutes = days.map((d) => d.minutes).filter((m): m is number => m !== null);
+    if (validMinutes.length === 0) return;
+
+    const maxMinutes = Math.max(...validMinutes, limitMinutes || 0);
+    const stepX = graphWidth / (days.length - 1);
+
+    // Build path points
+    const points: { x: number; y: number; minutes: number; color: string }[] = [];
+    days.forEach((day, i) => {
+      if (day.minutes !== null) {
+        const x = padding + i * stepX;
+        const y = padding + graphHeight - (day.minutes / maxMinutes) * graphHeight;
+
+        let color = colors.cyan;
+        if (limitMinutes) {
+          const pct = (day.minutes / limitMinutes) * 100;
+          if (pct > 100) color = colors.orange;
+          else if (pct > 66) color = colors.blue;
+        }
+
+        points.push({ x, y, minutes: day.minutes, color });
+      }
+    });
+
+    if (points.length === 0) return;
+
+    // Draw filled area with gradient
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, graphHeight + padding);
+
+    points.forEach((point, i) => {
+      if (i === 0) {
+        ctx.lineTo(point.x, point.y);
+      } else {
+        const prevPoint = points[i - 1];
+        const midX = (prevPoint.x + point.x) / 2;
+        ctx.quadraticCurveTo(prevPoint.x, prevPoint.y, midX, (prevPoint.y + point.y) / 2);
+        ctx.quadraticCurveTo(point.x, point.y, point.x, point.y);
+      }
+    });
+
+    ctx.lineTo(points[points.length - 1].x, graphHeight + padding);
+    ctx.closePath();
+
+    // Gradient fill
+    const gradient = ctx.createLinearGradient(0, padding, 0, graphHeight + padding);
+    gradient.addColorStop(0, `${colors.cyan}40`);
+    gradient.addColorStop(0.5, `${colors.blue}30`);
+    gradient.addColorStop(1, `${colors.orange}20`);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Draw line with color transitions
+    for (let i = 0; i < points.length - 1; i++) {
+      const start = points[i];
+      const end = points[i + 1];
+
+      const lineGradient = ctx.createLinearGradient(start.x, start.y, end.x, end.y);
+      lineGradient.addColorStop(0, start.color);
+      lineGradient.addColorStop(1, end.color);
+
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      const midX = (start.x + end.x) / 2;
+      ctx.quadraticCurveTo(start.x, start.y, midX, (start.y + end.y) / 2);
+      ctx.quadraticCurveTo(end.x, end.y, end.x, end.y);
+      ctx.strokeStyle = lineGradient;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.stroke();
+    }
+
+    // Draw dots
+    points.forEach((point, i) => {
+      const isHovered = hoveredDay?.index === days.findIndex((d) => d.minutes === point.minutes);
+      const radius = isHovered ? 5 : 3.5;
+
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = point.color;
+      ctx.fill();
+      ctx.strokeStyle = isDark ? colors.card : colors.background;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Glow effect on hover
+      if (isHovered) {
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, radius + 4, 0, Math.PI * 2);
+        ctx.strokeStyle = `${point.color}40`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+    });
+  }, [days, limitMinutes, isDark, colors, hoveredDay]);
+
+  return (
+    <div className="relative">
+      <canvas
+        ref={canvasRef}
+        className="w-full h-32 cursor-crosshair"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setHoveredDay(null)}
+      />
+      {hoveredDay && (
+        <div
+          className="fixed z-50 pointer-events-none px-2 py-1 rounded text-xs font-medium shadow-lg transition-all duration-150"
+          style={{
+            backgroundColor: colors.card,
+            color: colors.text,
+            border: `1px solid ${isDark ? "#2C2C2E" : "#E5E5EA"}`,
+            left: mousePos.x + 10,
+            top: mousePos.y - 30,
+          }}
+        >
+          {days[hoveredDay.index].key}: {formatScreenTimeLong(hoveredDay.minutes)}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ScreenTimeTodayCard({
@@ -57,83 +315,124 @@ export function ScreenTimeTodayCard({
   lastSyncedAt,
   history = [],
   todayDateKey,
-  appUsage = [],
 }: {
   activity: Activity;
   stats: ScreenTimeStats;
   lastSyncedAt: string | null;
   history?: { period_key: string; value: number | null }[];
   todayDateKey: string;
-  appUsage?: AppUsageData[];
 }) {
-  const days = recentScreenTimeDays(history, todayDateKey, 14);
-  const scale = activity.target_value ? activity.target_value * GAUGE_OVERSHOOT : 240;
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains("dark"));
+
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  const colors = isDark ? SCREENTIME_COLORS.dark : SCREENTIME_COLORS.light;
+
+  // Get last 14 days
+  const last14Days: DayPoint[] = [];
+  const today = new Date(todayDateKey);
+  for (let i = 13; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const key = date.toISOString().split("T")[0];
+    const entry = history.find((h) => h.period_key === key);
+    last14Days.push({ key, minutes: entry?.value ?? null });
+  }
 
   return (
-    <div className="card-interactive mb-6 rounded border border-line bg-card p-5 lg:rounded-xl">
-      <div className="mb-4 flex items-center justify-between">
+    <div
+      className="screentime-card mb-6 rounded-xl border p-6 transition-all duration-300"
+      style={{
+        backgroundColor: colors.card,
+        borderColor: isDark ? "#2C2C2E" : "#E5E5EA",
+      }}
+    >
+      {/* Header */}
+      <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <ActivityIcon icon={activity.icon} className="text-base" />
-          <span className="text-sm text-ink-soft">{activity.name}</span>
+          <ActivityIcon icon={activity.icon} className="text-lg" />
+          <span className="text-sm font-medium" style={{ color: colors.text }}>
+            {activity.name}
+          </span>
         </div>
-        <span className="text-xs text-ink-soft">Last synced {formatRelativeTime(lastSyncedAt)}</span>
+        <span className="text-xs" style={{ color: colors.textSoft }}>
+          {formatRelativeTime(lastSyncedAt)}
+        </span>
       </div>
 
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-        <div className="w-full shrink-0 sm:w-[190px]">
-          <ScreenTimeGauge minutes={stats.todayMinutes ?? 0} limitMinutes={activity.target_value} />
-          <div className="mt-1 text-center">
-            <TrendBadge todayMinutes={stats.todayMinutes} weeklyAverageMinutes={stats.weeklyAverageMinutes} />
+      <div className="grid gap-6 lg:grid-cols-[1fr_200px]">
+        {/* Left: Graph section */}
+        <div className="space-y-4">
+          {/* Segmented progress */}
+          <div>
+            <div className="mb-2 flex items-end justify-between">
+              <span className="text-2xl font-semibold" style={{ color: colors.text }}>
+                {formatScreenTimeLong(stats.todayMinutes)}
+              </span>
+              {activity.target_value && (
+                <span className="text-xs" style={{ color: colors.textSoft }}>
+                  of {formatScreenTimeLong(activity.target_value)}
+                </span>
+              )}
+            </div>
+            <SegmentedProgress
+              minutes={stats.todayMinutes ?? 0}
+              limitMinutes={activity.target_value}
+              isDark={isDark}
+            />
+          </div>
+
+          {/* Line graph */}
+          <div>
+            <p
+              className="mb-2 text-xs font-medium uppercase tracking-wide"
+              style={{ color: colors.textSoft }}
+            >
+              Last 14 days
+            </p>
+            <LineGraph days={last14Days} limitMinutes={activity.target_value} isDark={isDark} />
           </div>
         </div>
 
-        <div className="w-full divide-y divide-line sm:pl-6">
-          <StatRow label="Weekly average" value={formatScreenTimeLong(stats.weeklyAverageMinutes)} />
-          <StatRow label="Monthly average" value={formatScreenTimeLong(stats.monthlyAverageMinutes)} />
-          <StatRow label="Week lowest" value={formatScreenTimeLong(stats.weekLowestMinutes)} />
-        </div>
-      </div>
-
-      {/* App-wise breakdown */}
-      {appUsage.length > 0 && (
-        <div className="mt-5 border-t border-line/70 pt-4">
-          <p className="mb-3 text-xs uppercase tracking-wider text-ink-soft">Today's apps</p>
-          <div className="space-y-2">
-            {appUsage.slice(0, 5).map((app) => (
-              <div key={app.app_name} className="flex items-center justify-between text-sm">
-                <span className="text-ink">{app.app_name}</span>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-ink-soft">{formatScreenTimeLong(app.duration_minutes)}</span>
-                  <span className="w-10 text-right text-xs text-ink-soft">{app.percentage}%</span>
-                </div>
-              </div>
-            ))}
+        {/* Right: Analytics */}
+        <div className="flex flex-col justify-center space-y-3">
+          <div className="group cursor-default transition-transform hover:scale-105">
+            <p className="text-xs transition-colors" style={{ color: colors.textSoft }}>
+              Weekly Average
+            </p>
+            <p className="text-lg font-semibold transition-all" style={{ color: colors.text }}>
+              {formatScreenTimeLong(stats.weeklyAverageMinutes)}
+            </p>
           </div>
-          {appUsage.length > 5 && (
-            <p className="mt-2 text-xs text-ink-soft">+ {appUsage.length - 5} more apps</p>
-          )}
-        </div>
-      )}
-
-      {/* Desktop-only heat strip */}
-      <div className="hidden lg:block lg:mt-5 lg:border-t lg:border-line/70 lg:pt-4">
-        <p className="mb-2 text-[11px] uppercase tracking-wider text-ink-soft">Last 14 days</p>
-        <div className="flex h-12 items-end gap-1.5">
-          {days.map((d, i) => {
-            const level = d.minutes == null ? null : screenTimeLevel(d.minutes, activity.target_value);
-            const heightPct = d.minutes == null ? 6 : Math.max(8, Math.min(100, (d.minutes / scale) * 100));
-            return (
-              <div
-                key={d.key}
-                title={`${d.key}: ${formatScreenTimeLong(d.minutes)}`}
-                className={cn(
-                  "animate-heat-pop flex-1 rounded-t-sm transition-all duration-300 hover:opacity-75",
-                  d.minutes == null ? "bg-line/40" : LEVEL_BAR[level as ScreenTimeLevel]
-                )}
-                style={{ height: `${heightPct}%`, animationDelay: `${i * 25}ms` }}
-              />
-            );
-          })}
+          <div className="group cursor-default transition-transform hover:scale-105">
+            <p className="text-xs transition-colors" style={{ color: colors.textSoft }}>
+              Monthly Average
+            </p>
+            <p className="text-lg font-semibold transition-all" style={{ color: colors.text }}>
+              {formatScreenTimeLong(stats.monthlyAverageMinutes)}
+            </p>
+          </div>
+          <div className="group cursor-default transition-transform hover:scale-105">
+            <p className="text-xs transition-colors" style={{ color: colors.textSoft }}>
+              Week Lowest
+            </p>
+            <p className="text-lg font-semibold transition-all" style={{ color: colors.text }}>
+              {formatScreenTimeLong(stats.weekLowestMinutes)}
+            </p>
+          </div>
         </div>
       </div>
     </div>

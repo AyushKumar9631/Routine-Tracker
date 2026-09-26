@@ -21,7 +21,7 @@ import type {
   RecruitmentRound,
   StudyTimerConfig,
 } from "@/lib/types";
-import { computeScreenTimeStats } from "@/lib/screentime";
+import { computeScreenTimeStats, recentScreenTimeDays } from "@/lib/screentime";
 import { currentRound } from "@/lib/recruitment";
 import {
   deadlineFor,
