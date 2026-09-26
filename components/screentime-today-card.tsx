@@ -50,19 +50,19 @@ function SegmentedSpeedometer({
   isDark: boolean;
 }) {
   const colors = isDark ? SCREENTIME_COLORS.dark : SCREENTIME_COLORS.light;
-  const limit = limitMinutes || 240; // Default 4 hours
+  const limit = limitMinutes || 240;
   const percentage = Math.min((minutes / limit) * 100, 100);
   const filledBoxes = Math.floor((percentage / 100) * 15);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const CX = 100;
   const CY = 100;
-  const R = 78;
+  const R = 70;
   const START_ANGLE = 135;
   const SWEEP = 270;
   const SEGMENT_COUNT = 15;
   const SEGMENT_ANGLE = SWEEP / SEGMENT_COUNT;
-  const GAP = 3; // Gap between segments in degrees
+  const GAP = 3;
 
   const polarToCartesian = (angle: number, radius: number) => {
     const rad = (angle * Math.PI) / 180;
@@ -73,8 +73,8 @@ function SegmentedSpeedometer({
   };
 
   const createSegmentPath = (startAngle: number, endAngle: number) => {
-    const innerRadius = R - 6;
-    const outerRadius = R + 6;
+    const innerRadius = R - 8;
+    const outerRadius = R + 8;
 
     const start1 = polarToCartesian(startAngle, innerRadius);
     const end1 = polarToCartesian(endAngle, innerRadius);
@@ -91,8 +91,8 @@ function SegmentedSpeedometer({
   };
 
   return (
-    <div className="relative w-full max-w-[200px] mx-auto">
-      <svg viewBox="0 0 200 170" className="w-full" aria-hidden="true">
+    <div className="relative w-full max-w-[200px]">
+      <svg viewBox="0 0 200 180" className="w-full" aria-hidden="true">
         {Array.from({ length: SEGMENT_COUNT }).map((_, i) => {
           const segmentStart = START_ANGLE + i * SEGMENT_ANGLE + (i > 0 ? GAP / 2 : 0);
           const segmentEnd = START_ANGLE + (i + 1) * SEGMENT_ANGLE - GAP / 2;
@@ -125,33 +125,51 @@ function SegmentedSpeedometer({
                 opacity={opacity}
                 className={cn(
                   "transition-all duration-300 cursor-pointer",
-                  shouldBlink && "animate-pulse",
-                  isHovered && "scale-105"
+                  shouldBlink && "animate-pulse"
                 )}
                 style={{
                   transformOrigin: `${CX}px ${CY}px`,
+                  transform: isHovered ? "scale(1.05)" : "scale(1)",
                 }}
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}
               >
-                <title>{`${Math.round((i / 15) * 100)}% - ${formatScreenTimeLong(
+                <title>{`${Math.round(((i + 1) / 15) * 100)}% - ${formatScreenTimeLong(
                   Math.round((limit / 15) * (i + 1))
                 )}`}</title>
               </path>
             </g>
           );
         })}
-      </svg>
 
-      {/* Center text */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <div className="text-4xl font-semibold font-mono tabular-nums" style={{ color: colors.text }}>
+        {/* Center text inside SVG */}
+        <text
+          x={CX}
+          y={CY - 8}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className="font-mono font-semibold"
+          style={{
+            fontSize: "32px",
+            fill: colors.text,
+            fontVariantNumeric: "tabular-nums"
+          }}
+        >
           {formatScreenTimeLong(minutes)}
-        </div>
-        <div className="text-[10px] mt-1" style={{ color: colors.textSoft }}>
+        </text>
+        <text
+          x={CX}
+          y={CY + 18}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          style={{
+            fontSize: "9px",
+            fill: colors.textSoft,
+          }}
+        >
           screen time today
-        </div>
-      </div>
+        </text>
+      </svg>
     </div>
   );
 }
@@ -184,7 +202,6 @@ function LineGraph({
     const graphWidth = width - padding * 2;
     const stepX = graphWidth / (days.length - 1);
 
-    // Find closest day
     let closestIndex = -1;
     let closestDist = Infinity;
 
@@ -236,17 +253,14 @@ function LineGraph({
     const graphWidth = width - padding * 2;
     const graphHeight = height - padding * 2;
 
-    // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
-    // Find max value for scaling
     const validMinutes = days.map((d) => d.minutes).filter((m): m is number => m !== null);
     if (validMinutes.length === 0) return;
 
     const maxMinutes = Math.max(...validMinutes, limitMinutes || 0);
     const stepX = graphWidth / (days.length - 1);
 
-    // Build path points
     const points: { x: number; y: number; minutes: number; color: string }[] = [];
     days.forEach((day, i) => {
       if (day.minutes !== null) {
@@ -266,7 +280,6 @@ function LineGraph({
 
     if (points.length === 0) return;
 
-    // Draw filled area with gradient
     ctx.beginPath();
     ctx.moveTo(points[0].x, graphHeight + padding);
 
@@ -284,7 +297,6 @@ function LineGraph({
     ctx.lineTo(points[points.length - 1].x, graphHeight + padding);
     ctx.closePath();
 
-    // Gradient fill
     const gradient = ctx.createLinearGradient(0, padding, 0, graphHeight + padding);
     gradient.addColorStop(0, `${colors.cyan}40`);
     gradient.addColorStop(0.5, `${colors.blue}30`);
@@ -292,7 +304,6 @@ function LineGraph({
     ctx.fillStyle = gradient;
     ctx.fill();
 
-    // Draw line with color transitions
     for (let i = 0; i < points.length - 1; i++) {
       const start = points[i];
       const end = points[i + 1];
@@ -313,8 +324,7 @@ function LineGraph({
       ctx.stroke();
     }
 
-    // Draw dots
-    points.forEach((point, i) => {
+    points.forEach((point) => {
       const isHovered = hoveredDay?.index === days.findIndex((d) => d.minutes === point.minutes);
       const radius = isHovered ? 5 : 3.5;
 
@@ -326,7 +336,6 @@ function LineGraph({
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Glow effect on hover
       if (isHovered) {
         ctx.beginPath();
         ctx.arc(point.x, point.y, radius + 4, 0, Math.PI * 2);
@@ -395,7 +404,6 @@ export function ScreenTimeTodayCard({
 
   const colors = isDark ? SCREENTIME_COLORS.dark : SCREENTIME_COLORS.light;
 
-  // Get last 14 days
   const last14Days: DayPoint[] = [];
   const today = new Date(todayDateKey);
   for (let i = 13; i >= 0; i--) {
@@ -408,7 +416,7 @@ export function ScreenTimeTodayCard({
 
   return (
     <div
-      className="screentime-card mb-6 rounded-xl border p-6 transition-all duration-300"
+      className="screentime-card mb-6 rounded-xl border p-6 transition-all duration-300 lg:col-span-2 xl:col-span-2"
       style={{
         backgroundColor: colors.card,
         borderColor: isDark ? "#2C2C2E" : "#E5E5EA",
@@ -429,7 +437,7 @@ export function ScreenTimeTodayCard({
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Left: Speedometer */}
-        <div className="flex flex-col items-center justify-start lg:w-64 shrink-0">
+        <div className="flex flex-col items-center justify-start shrink-0">
           <SegmentedSpeedometer
             minutes={stats.todayMinutes ?? 0}
             limitMinutes={activity.target_value}
