@@ -241,7 +241,7 @@ function LineGraph({
     if (closestIndex >= 0 && days[closestIndex].minutes !== null) {
       const validMinutes = days.map((d) => d.minutes).filter((m): m is number => m !== null);
       const maxMinutes = Math.max(...validMinutes, limitMinutes || 0);
-      const dayX = padding + i * stepX;
+      const dayX = padding + closestIndex * stepX;
       const canvasRect = canvas.getBoundingClientRect();
 
       setHoveredDay({
