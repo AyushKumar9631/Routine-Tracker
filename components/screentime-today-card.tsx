@@ -139,12 +139,19 @@ function SegmentedSpeedometer({
                 style={{
                   transformOrigin: `${CX}px ${CY}px`,
                   transform: isHovered ? "scale(1.05)" : "scale(1)",
-                  animation: `heat-pop 0.35s ease-out backwards ${i * 40}ms`,
                 }}
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}
               >
                 <title>{`${Math.round(((i + 1) / 15) * 100)}%`}</title>
+                <animate
+                  attributeName="opacity"
+                  from="0"
+                  to={opacity.toString()}
+                  dur="0.35s"
+                  begin={`${i * 0.04}s`}
+                  fill="freeze"
+                />
               </path>
             </g>
           );
@@ -241,12 +248,11 @@ function LineGraph({
     if (closestIndex >= 0 && days[closestIndex].minutes !== null) {
       const stepX = graphWidth / (days.length - 1);
       const dayX = padding + closestIndex * stepX;
-      const canvasRect = canvas.getBoundingClientRect();
 
       setHoveredDay({
         index: closestIndex,
-        x: canvasRect.left + dayX,
-        y: canvasRect.top - 15,
+        x: dayX,
+        y: 0,
         minutes: days[closestIndex].minutes!,
       });
     } else {
@@ -385,13 +391,14 @@ function LineGraph({
       />
       {hoveredDay && (
         <div
-          className="fixed z-50 pointer-events-none px-2 py-1 rounded text-xs font-medium shadow-lg"
+          className="absolute z-50 pointer-events-none px-2 py-1 rounded text-xs font-medium shadow-lg whitespace-nowrap"
           style={{
             backgroundColor: colors.card,
             color: colors.text,
             border: `1px solid ${isDark ? "#2C2C2E" : "#E5E5EA"}`,
-            left: hoveredDay.x - 35,
-            top: hoveredDay.y - 10,
+            left: `${hoveredDay.x}px`,
+            top: `-35px`,
+            transform: `translateX(-50%)`,
           }}
         >
           {formatScreenTimeLong(hoveredDay.minutes)}
