@@ -133,12 +133,13 @@ function SegmentedSpeedometer({
                 fill={fillColor}
                 opacity={opacity}
                 className={cn(
-                  "transition-all duration-300 cursor-pointer",
+                  "transition-all duration-300 cursor-pointer animate-heat-pop",
                   shouldBlink && "animate-pulse"
                 )}
                 style={{
                   transformOrigin: `${CX}px ${CY}px`,
                   transform: isHovered ? "scale(1.05)" : "scale(1)",
+                  animationDelay: `${i * 40}ms`,
                 }}
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}
@@ -220,6 +221,7 @@ function LineGraph({
     const width = rect.width;
     const padding = 10;
     const graphWidth = width - padding * 2;
+    const graphHeight = rect.height - padding * 2;
     const stepX = graphWidth / (days.length - 1);
 
     let closestIndex = -1;
@@ -239,14 +241,13 @@ function LineGraph({
     if (closestIndex >= 0 && days[closestIndex].minutes !== null) {
       const validMinutes = days.map((d) => d.minutes).filter((m): m is number => m !== null);
       const maxMinutes = Math.max(...validMinutes, limitMinutes || 0);
-      const graphHeight = rect.height - padding * 2;
-      const dayX = padding + closestIndex * stepX;
-      const dayY = padding + graphHeight - (days[closestIndex].minutes! / maxMinutes) * graphHeight;
+      const dayX = padding + i * stepX;
+      const canvasRect = canvas.getBoundingClientRect();
 
       setHoveredDay({
         index: closestIndex,
-        x: dayX,
-        y: dayY,
+        x: canvasRect.left + dayX,
+        y: canvasRect.top,
         minutes: days[closestIndex].minutes!,
       });
     } else {
@@ -385,13 +386,13 @@ function LineGraph({
       />
       {hoveredDay && (
         <div
-          className="fixed z-50 pointer-events-none px-2 py-1 rounded text-xs font-medium shadow-lg transition-all duration-150"
+          className="fixed z-50 pointer-events-none px-2 py-1 rounded text-xs font-medium shadow-lg"
           style={{
             backgroundColor: colors.card,
             color: colors.text,
             border: `1px solid ${isDark ? "#2C2C2E" : "#E5E5EA"}`,
-            left: mousePos.x - 35,
-            top: mousePos.y - 45,
+            left: hoveredDay.x - 35,
+            top: hoveredDay.y - 10,
           }}
         >
           {formatScreenTimeLong(hoveredDay.minutes)}
