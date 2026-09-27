@@ -79,50 +79,54 @@ function formatTimeRemaining(seconds: number): string {
   return seconds < 0 ? `-${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
 }
 
-/** Vertical speedometer with stacked curved bars - tapered shape */
+/** Vertical speedometer - stacked rectangles with arc cuts on both sides */
 function VerticalSpeedometer({ percentage, isDark }: { percentage: number; isDark: boolean }) {
   const bars = 10;
   const filledBars = Math.floor((percentage / 100) * bars);
+  const maxWidth = 80;
+  const minWidth = 20;
 
   return (
-    <div className="flex flex-col-reverse items-end gap-1" style={{ width: '100px' }}>
-      {Array.from({ length: bars }).map((_, i) => {
-        const isFilled = i < filledBars;
-        // Width decreases as we go up (0 = bottom/widest, 9 = top/narrowest)
-        const barWidth = 100 - i * 8; // 100px at bottom, 28px at top
-        const barHeight = 6;
+    <div className="relative" style={{ width: `${maxWidth}px`, height: '100px' }}>
+      <svg width={maxWidth} height="100" viewBox={`0 0 ${maxWidth} 100`}>
+        <defs>
+          {/* Clip path with arc cuts on left (smaller) and right (larger) */}
+          <clipPath id="speedometer-clip">
+            <path
+              d={`
+                M 0 0
+                Q 15 50 0 100
+                L ${maxWidth} 100
+                Q ${maxWidth - 25} 50 ${maxWidth} 0
+                Z
+              `}
+            />
+          </clipPath>
+        </defs>
 
-        return (
-          <div
-            key={i}
-            className="relative transition-all duration-300"
-            style={{
-              width: `${barWidth}px`,
-              height: `${barHeight}px`,
-              opacity: 0,
-              animation: `fadeIn 0.35s ease-out ${i * 0.04}s forwards`,
-            }}
-          >
-            <svg
-              width={barWidth}
-              height={barHeight}
-              viewBox={`0 0 ${barWidth} ${barHeight}`}
-              className="w-full h-full"
-            >
-              <rect
-                x="0"
-                y="0"
-                width={barWidth}
-                height={barHeight}
-                rx="2"
-                fill={isFilled ? ACCENT : (isDark ? "#3A3A3A" : "#E5E5E5")}
-                stroke={isFilled ? ACCENT : (isDark ? "#4A4A4A" : "#D5D5D5")}
-                strokeWidth="0.5"
-              />
-            </svg>
-          </div>
-        );
-      })}
+        {Array.from({ length: bars }).map((_, i) => {
+          const isFilled = i < filledBars;
+          const y = (bars - 1 - i) * 10; // Stack from bottom to top
+
+          return (
+            <rect
+              key={i}
+              x="0"
+              y={y}
+              width={maxWidth}
+              height="9"
+              fill={isFilled ? ACCENT : (isDark ? "#3A3A3A" : "#E5E5E5")}
+              stroke={isFilled ? ACCENT : (isDark ? "#4A4A4A" : "#D5D5D5")}
+              strokeWidth="0.5"
+              clipPath="url(#speedometer-clip)"
+              style={{
+                opacity: 0,
+                animation: `fadeIn 0.35s ease-out ${i * 0.04}s forwards`,
+              }}
+            />
+          );
+        })}
+      </svg>
     </div>
   );
 }
@@ -379,7 +383,7 @@ export function StudyTimerCard({
       <div className="mt-5 pt-4 border-t border-[#E5E5E5] dark:border-[#3A3A3A]">
         <div
           key={`sweep-${sweepRun}`}
-          className="flex items-center gap-1.5"
+          className="flex items-end gap-1"
           style={{
             ["--tally-accent" as string]: ACCENT,
             ["--tally-glow" as string]: ACCENT_GLOW,
@@ -394,16 +398,14 @@ export function StudyTimerCard({
               : "tally-sweep-empty";
 
             return (
-              <div
+              <span
                 key={day.key}
                 className={cn(
-                  "h-7 w-[6px] rounded-sm",
-                  sweepRun > 0 ? animClass : day.done ? "bg-moss" : "bg-[#E5E5E5] dark:bg-[#3A3A3A]"
+                  "h-7 w-2 skew-x-[-12deg] text-[#262626]/10 transition-all duration-300 dark:text-white/10",
+                  sweepRun > 0 ? animClass : day.done ? "bg-moss shadow-[0_0_6px_rgba(63,107,71,0.6)]" : "bg-current"
                 )}
                 style={{
-                  animationDelay: `${i * 50}ms`,
-                  color: "#E5E5E5",
-                  transform: `skewX(-8deg)`,
+                  animationDelay: `${i * 55}ms`,
                 }}
               />
             );
