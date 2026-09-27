@@ -47,6 +47,8 @@ export default async function ActivityDetailPage({
 
   const typedActivity = activity as Activity;
   const completions = (completionsData ?? []) as Completion[];
+  const key = todayKey();
+  const todayCompletion = completions.find((c) => c.period_key === key) ?? null;
 
   let leetcodeConfig: LeetCodeConfig | null = null;
   if (typedActivity.automation_type === "leetcode_potd") {
@@ -158,13 +160,12 @@ export default async function ActivityDetailPage({
         {typedActivity.automation_type === "study_timer" && (
           <div className="mb-10">
             <StudyTimerCard
-              activityId={typedActivity.id}
-              activityName={typedActivity.name}
-              activityIcon={typedActivity.icon}
-              goalMinutes={typedActivity.target_value}
+              activity={typedActivity}
+              completion={todayCompletion}
+              periodKey={key}
+              heatmapCompletions={completions}
               runningSince={studyTimerConfig?.running_since ?? null}
               baseMinutes={studyTimerBaseMinutes}
-              notifyOnGoal={studyTimerConfig?.notify_on_goal ?? true}
             />
           </div>
         )}
