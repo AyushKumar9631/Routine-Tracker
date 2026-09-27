@@ -188,3 +188,22 @@ export async function notifyStudyGoalReached(activityId: string): Promise<boolea
 
   return sendNotification(topic, "Study goal reached \u{1F3AF}", message);
 }
+
+export async function completeStudyTimer(activityId: string, periodKey: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { error } = await supabase
+    .from("completions")
+    .update({ completed: true })
+    .eq("activity_id", activityId)
+    .eq("period_key", periodKey);
+
+  if (error) throw error;
+
+  revalidatePath("/");
+  revalidatePath(`/activities/${activityId}`);
+}

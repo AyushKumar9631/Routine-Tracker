@@ -1,18 +1,142 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { startStudyTimer, stopStudyTimer, notifyStudyGoalReached } from "@/actions/study-timer";
-import { ActivityIcon } from "@/components/activity-icon";
-import { CompletionHeatmap } from "@/components/completion-heatmap";
-import { formatScreenTimeLong } from "@/lib/screentime";
-import { formatStudyClock, liveElapsedSeconds } from "@/lib/study-timer";
+import { startStudyTimer, stopStudyTimer, notifyStudyGoalReached, completeStudyTimer } from "@/actions/study-timer";
 import type { Activity, Completion } from "@/lib/types";
-import { cn, isImageIcon } from "@/lib/utils";
+import { calcStreak, cn, formatDateKey, isImageIcon, parseDateKey } from "@/lib/utils";
 
-const RING_R = 54;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_R;
+// Study Timer brand colors - green theme
+const ACCENT = "#3F6B47"; // moss green
+const ACCENT_GLOW = "rgba(63, 107, 71, 0.6)";
 
-/** A short ascending three-note chime via the Web Audio API — no audio file to ship or host. */
+const STUDY_FONT =
+  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+
+function StudyTimerMark({ icon, className }: { icon?: string | null; className?: string }) {
+  if (icon && isImageIcon(icon)) {
+    return (
+      <img src={icon} alt="" className={cn("h-9 w-9 shrink-0 rounded-lg object-contain", className)} />
+    );
+  }
+  if (icon) {
+    return (
+      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xl", className)} aria-hidden="true">
+        {icon}
+      </span>
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-black text-white",
+        className
+      )}
+      style={{ background: `linear-gradient(135deg, ${ACCENT}, #2A4A30)` }}
+      aria-hidden="true"
+    >
+      ST
+    </span>
+  );
+}
+
+function FlameIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M12.9 1.6c.6 3-.6 4.8-2.3 6.6C8.8 10 7 12 7 14.8a5 5 0 0 0 10 0c0-1.9-.8-3.2-1.7-4.4.2 1.7-.4 2.8-1.4 3.6-.2-1.5-1-2.5-2-3.4-1.5-1.4-3.1-2.9-1-9Z" />
+    </svg>
+  );
+}
+
+function last14Days(completions: Completion[], todayDateKey: string) {
+  const completedKeys = new Set(completions.filter((c) => c.completed).map((c) => c.period_key));
+  const cursor = parseDateKey(todayDateKey);
+  cursor.setDate(cursor.getDate() - 13);
+
+  const days: { key: string; done: boolean }[] = [];
+  for (let i = 0; i < 14; i++) {
+    const dayKey = formatDateKey(cursor);
+    days.push({ key: dayKey, done: completedKeys.has(dayKey) });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
+}
+
+function liveElapsedSeconds(startedAt: string | null, nowMs: number): number {
+  if (!startedAt) return 0;
+  const started = new Date(startedAt).getTime();
+  return Math.floor((nowMs - started) / 1000);
+}
+
+function formatTimeRemaining(seconds: number): string {
+  const absSeconds = Math.abs(seconds);
+  const h = Math.floor(absSeconds / 3600);
+  const m = Math.floor((absSeconds % 3600) / 60);
+  const s = absSeconds % 60;
+  const hh = String(h).padStart(2, "0");
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  return seconds < 0 ? `-${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+}
+
+/** Vertical speedometer with stacked curved bars */
+function VerticalSpeedometer({ percentage, isDark }: { percentage: number; isDark: boolean }) {
+  const bars = 10;
+  const filledBars = Math.floor((percentage / 100) * bars);
+
+  return (
+    <div className="flex flex-col-reverse items-center gap-1" style={{ width: '80px' }}>
+      {Array.from({ length: bars }).map((_, i) => {
+        const isFilled = i < filledBars;
+        const barWidth = 40 + i * 4; // increasing width from bottom to top
+
+        return (
+          <svg
+            key={i}
+            width={barWidth}
+            height="8"
+            viewBox={`0 0 ${barWidth} 8`}
+            className="transition-all duration-300"
+            style={{
+              opacity: 0,
+              animation: `fadeIn 0.35s ease-out ${i * 0.04}s forwards`,
+            }}
+          >
+            <defs>
+              <clipPath id={`curve-clip-${i}`}>
+                <path
+                  d={`
+                    M 0 0
+                    L ${barWidth - 4} 0
+                    Q ${barWidth} 0 ${barWidth} 4
+                    Q ${barWidth} 8 ${barWidth - 4} 8
+                    L 4 8
+                    Q 0 8 0 4
+                    Q 0 0 4 0
+                    Z
+                  `}
+                />
+              </clipPath>
+            </defs>
+            <rect
+              x="0"
+              y="0"
+              width={barWidth}
+              height="8"
+              rx="4"
+              fill={isFilled ? ACCENT : (isDark ? "#3A3A3A" : "#E5E5E5")}
+              stroke={isFilled ? ACCENT : (isDark ? "#4A4A4A" : "#D5D5D5")}
+              strokeWidth="1"
+              clipPath={`url(#curve-clip-${i})`}
+            />
+          </svg>
+        );
+      })}
+    </div>
+  );
+}
+
+/** A short ascending three-note chime via the Web Audio API */
 function playChime(ctxRef: { current: AudioContext | null }) {
   try {
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -36,7 +160,7 @@ function playChime(ctxRef: { current: AudioContext | null }) {
       osc.stop(now + offset + 0.18);
     });
   } catch {
-    // Web Audio unsupported/blocked — the sound is a nice-to-have, never block on it.
+    // Web Audio unsupported/blocked
   }
 }
 
@@ -45,36 +169,34 @@ function showBrowserNotification(activityName: string, icon: string | null) {
   if (Notification.permission !== "granted") return;
   try {
     new Notification("Study goal reached", {
-      body: `${activityName} \u2014 nice work. The timer is now counting overtime.`,
+      body: `${activityName} — nice work. The timer is now counting overtime.`,
       icon: isImageIcon(icon) ? (icon as string) : undefined,
     });
   } catch {
-    // Some browsers (mobile Safari) support the permission but not `new Notification()` directly.
+    // Some browsers don't support new Notification()
   }
 }
 
 export function StudyTimerCard({
-  activityId,
-  activityName,
-  activityIcon,
-  goalMinutes,
+  activity,
+  completion,
+  periodKey,
+  heatmapCompletions,
   runningSince: initialRunningSince,
   baseMinutes: initialBaseMinutes,
-  notifyOnGoal,
-  activity,
-  heatmapCompletions = [],
 }: {
-  activityId: string;
-  activityName: string;
-  activityIcon: string | null;
-  goalMinutes: number | null;
+  activity: Activity;
+  completion: Completion | null;
+  periodKey: string;
+  heatmapCompletions: Completion[];
   runningSince: string | null;
   baseMinutes: number;
-  notifyOnGoal: boolean;
-  /** Full activity row — only used to drive the desktop card's heatmap. */
-  activity?: Activity;
-  heatmapCompletions?: Completion[];
 }) {
+  const isDone = completion?.completed ?? false;
+  const streak = calcStreak(activity, heatmapCompletions);
+  const days = last14Days(heatmapCompletions, periodKey);
+  const goalMinutes = activity.target_value ?? 0;
+
   const [runningSince, setRunningSince] = useState(initialRunningSince);
   const [baseMinutes, setBaseMinutes] = useState(initialBaseMinutes);
   const [tick, setTick] = useState<number | null>(null);
@@ -85,10 +207,22 @@ export function StudyTimerCard({
   const prevRemainingRef = useRef<number | null>(null);
   const notifiedForSessionRef = useRef<string | null>(null);
 
-  // Live per-second tick while a session is running. Starts null so the
-  // server-rendered markup and the first client render match exactly (same
-  // trick as useDeadlineCountdown) — the real elapsed time fills in a
-  // moment later via this effect.
+  const cardRef = useRef<HTMLLIElement>(null);
+  const [sweepRun, setSweepRun] = useState(0);
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setSweepRun((n) => n + 1);
+      },
+      { threshold: 0.4 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (!runningSince) {
       setTick(null);
@@ -100,14 +234,11 @@ export function StudyTimerCard({
     return () => clearInterval(id);
   }, [runningSince]);
 
-  // A fresh session (new Start) always begins by just recording its
-  // baseline tick — never treated as "just crossed zero" even if it starts
-  // already over goal (e.g. stop/restart later the same day).
   useEffect(() => {
     prevRemainingRef.current = null;
   }, [runningSince]);
 
-  const goalSeconds = (goalMinutes ?? 0) * 60;
+  const goalSeconds = goalMinutes * 60;
   const liveSeconds = tick === null ? 0 : liveElapsedSeconds(runningSince, tick);
   const studiedSeconds = baseMinutes * 60 + liveSeconds;
   const remaining = goalSeconds - studiedSeconds;
@@ -118,7 +249,6 @@ export function StudyTimerCard({
     prevRemainingRef.current = remaining;
 
     if (
-      notifyOnGoal &&
       prev !== null &&
       prev > 0 &&
       remaining <= 0 &&
@@ -126,16 +256,13 @@ export function StudyTimerCard({
     ) {
       notifiedForSessionRef.current = runningSince;
       playChime(audioCtxRef);
-      showBrowserNotification(activityName, activityIcon);
-      notifyStudyGoalReached(activityId).catch(() => {});
+      showBrowserNotification(activity.name, activity.icon);
+      notifyStudyGoalReached(activity.id).catch(() => {});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remaining, tick, runningSince]);
+  }, [remaining, tick, runningSince, goalMinutes, activity.name, activity.icon, activity.id]);
 
   function handleStart() {
     setError(null);
-    // Unlock audio + ask for notification permission on this user gesture —
-    // both need one, and this click is the only one we're guaranteed to get.
     try {
       const Ctx =
         window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -144,16 +271,14 @@ export function StudyTimerCard({
         audioCtxRef.current = ctx;
         if (ctx.state === "suspended") ctx.resume();
       }
-    } catch {
-      // ignore — sound just won't be available
-    }
+    } catch {}
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
 
     startTransition(async () => {
       try {
-        const config = await startStudyTimer(activityId);
+        const config = await startStudyTimer(activity.id);
         setRunningSince(config.running_since);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Couldn't start the timer");
@@ -165,7 +290,7 @@ export function StudyTimerCard({
     setError(null);
     startTransition(async () => {
       try {
-        const result = await stopStudyTimer(activityId);
+        const result = await stopStudyTimer(activity.id);
         setBaseMinutes(result.totalMinutes);
         setRunningSince(null);
       } catch (err) {
@@ -174,87 +299,129 @@ export function StudyTimerCard({
     });
   }
 
+  async function handleMarkDone() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await completeStudyTimer(activity.id, periodKey);
+        window.location.reload();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't mark as complete");
+      }
+    });
+  }
+
   const isRunning = Boolean(runningSince);
   const goalReached = remaining <= 0;
-  const fraction = goalSeconds > 0 ? Math.min(1, Math.max(0, studiedSeconds / goalSeconds)) : 0;
+  const percentage = goalSeconds > 0 ? Math.min(100, Math.max(0, (studiedSeconds / goalSeconds) * 100)) : 0;
 
   return (
-    <div
+    <li
+      ref={cardRef}
       className={cn(
-        "card-interactive relative mb-6 rounded border border-line bg-card p-5 lg:rounded-xl",
+        "group relative mb-4 overflow-hidden rounded-2xl border p-5 lg:mb-0 transition-all duration-300",
+        "border-[#E5E5E5] bg-white text-[#262626]",
+        "dark:border-[#3A3A3A] dark:bg-[#1A1A1A] dark:text-white",
         isRunning && "ring-pulse-moss"
       )}
+      style={{ fontFamily: STUDY_FONT, width: isDone ? undefined : '360px', maxWidth: '100%' }}
     >
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ActivityIcon icon={activityIcon} className="text-base" />
-          <span className="text-sm text-ink-soft">{activityName}</span>
-        </div>
-        {goalMinutes != null && (
-          <span className="text-xs text-ink-soft">Goal {formatScreenTimeLong(goalMinutes)}</span>
-        )}
-      </div>
-
-      <div className="flex flex-col items-center gap-3 py-2">
-        <div className="relative flex h-36 w-36 items-center justify-center lg:h-44 lg:w-44">
-          {goalMinutes ? (
-            <svg viewBox="0 0 120 120" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden="true">
-              <circle cx="60" cy="60" r={RING_R} fill="none" strokeWidth="6" className="stroke-line" />
-              <circle
-                cx="60"
-                cy="60"
-                r={RING_R}
-                fill="none"
-                strokeWidth="6"
-                strokeLinecap="round"
-                strokeDasharray={RING_CIRCUMFERENCE}
-                strokeDashoffset={RING_CIRCUMFERENCE * (1 - fraction)}
-                className={cn(
-                  "transition-[stroke-dashoffset] duration-700 ease-out",
-                  goalReached ? "stroke-moss" : isRunning ? "stroke-ink" : "stroke-ink-soft/50"
-                )}
-              />
-            </svg>
-          ) : null}
-          <div
-            className={cn(
-              "font-mono text-4xl tabular-nums lg:text-5xl",
-              goalReached ? "text-moss" : isRunning ? "text-ink" : "text-ink-soft"
-            )}
-            style={{ fontVariantNumeric: "tabular-nums" }}
-          >
-            {formatStudyClock(remaining)}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <StudyTimerMark icon={activity.icon} />
+          <div className="min-w-0">
+            <Link
+              href={`/activities/${activity.id}`}
+              className="block truncate text-base font-bold leading-tight hover:underline underline-offset-2"
+            >
+              {activity.name || "Study Timer"}
+            </Link>
           </div>
         </div>
-        <p className="text-xs text-ink-soft">
-          {formatScreenTimeLong(Math.max(0, studiedSeconds) / 60)} studied
-          {goalReached ? " \u2014 overtime counting" : " so far"}
-        </p>
 
-        <button
-          type="button"
-          onClick={isRunning ? handleStop : handleStart}
-          disabled={isPending || !goalMinutes}
-          className={cn(
-            "mt-1 rounded px-6 py-2 text-sm font-medium text-paper transition-all duration-200 hover:opacity-90 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100",
-            isRunning ? "bg-rust" : "bg-moss"
-          )}
-        >
-          {isPending ? "\u2026" : isRunning ? "Stop" : "Start"}
-        </button>
-
-        {!goalMinutes && (
-          <p className="text-xs text-rust">Set a daily goal by editing this activity to start the timer.</p>
-        )}
-        {error && <p className="text-xs text-rust">{error}</p>}
+        <div className={cn("flex shrink-0 items-center gap-1", isDone ? "text-moss" : "text-[#8A8A8A]")}>
+          <FlameIcon className="h-4 w-4" />
+          <span className="text-sm font-semibold tabular-nums">{streak}</span>
+        </div>
       </div>
 
-      {activity && (
-        <div className="hidden lg:block lg:mt-5 lg:border-t lg:border-line/70 lg:pt-4">
-          <p className="mb-2 text-[11px] uppercase tracking-wider text-ink-soft">Last 10 weeks</p>
-          <CompletionHeatmap activity={activity} completions={heatmapCompletions} weeks={10} compact />
+      <div className="mt-4 flex items-center justify-between">
+        <div className="flex-1">
+          <div
+            className="text-4xl font-bold tabular-nums"
+            style={{
+              fontVariantNumeric: "tabular-nums",
+              color: goalReached ? ACCENT : (isRunning ? "inherit" : "#8A8A8A")
+            }}
+          >
+            {formatTimeRemaining(remaining)}
+          </div>
+          <p className="mt-1 text-xs text-[#8A8A8A]">
+            {goalReached ? "overtime counting" : "time remaining"}
+          </p>
+
+          <button
+            type="button"
+            onClick={isRunning ? handleStop : (isDone ? handleMarkDone : handleStart)}
+            disabled={isPending || !goalMinutes}
+            className={cn(
+              "mt-3 rounded-lg px-6 py-2 text-sm font-semibold transition-all duration-200 hover:opacity-90 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100",
+              isRunning ? "bg-rust text-white" : "bg-moss text-white"
+            )}
+          >
+            {isPending ? "…" : isRunning ? "Stop" : isDone ? "✓ Done" : "Start"}
+          </button>
+
+          {!goalMinutes && (
+            <p className="mt-2 text-xs text-rust">Set a daily goal to start the timer.</p>
+          )}
+          {error && <p className="mt-2 text-xs text-rust">{error}</p>}
         </div>
-      )}
-    </div>
+
+        {!isDone && (
+          <div className="flex items-center gap-3">
+            <VerticalSpeedometer
+              percentage={percentage}
+              isDark={false}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-5 pt-4 border-t border-[#E5E5E5] dark:border-[#3A3A3A]">
+        <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-[#8A8A8A]">Last 14 days</p>
+        <div
+          key={`sweep-${sweepRun}`}
+          className="flex items-center gap-1.5"
+          style={{
+            ["--tally-accent" as string]: ACCENT,
+            ["--tally-glow" as string]: ACCENT_GLOW,
+          }}
+        >
+          {days.map((day, i) => {
+            const isToday = day.key === periodKey;
+            const animClass = day.done
+              ? "tally-sweep-fill"
+              : isToday && !isDone
+              ? "tally-sweep-today"
+              : "tally-sweep-empty";
+
+            return (
+              <div
+                key={day.key}
+                className={cn(
+                  "h-7 w-[6px] rounded-sm",
+                  sweepRun > 0 ? animClass : day.done ? "bg-moss" : "bg-[#E5E5E5] dark:bg-[#3A3A3A]"
+                )}
+                style={{
+                  animationDelay: `${i * 50}ms`,
+                  color: "#E5E5E5",
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </li>
   );
 }

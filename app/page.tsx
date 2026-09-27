@@ -67,13 +67,12 @@ export default async function DashboardPage() {
   const routineActivities = all.filter((a) => a.kind !== "recruitment");
   const recruitmentActivities = all.filter((a) => a.kind === "recruitment");
 
-  // Screen Time and Study Timer are both passive/self-driven top-of-page
-  // cards, not rows with a deadline — same reasoning for each, just two
-  // different automation types pulled out before the due-today tally.
+  // Screen Time is passive/self-driven top-of-page card, not a row with a
+  // deadline. Study Timer, however, now appears as a task card in dueToday.
   const screenTimeActivity = routineActivities.find((a) => a.automation_type === "screen_time") ?? null;
   const studyTimerActivity = routineActivities.find((a) => a.automation_type === "study_timer") ?? null;
   const taskActivities = routineActivities.filter(
-    (a) => a.automation_type !== "screen_time" && a.automation_type !== "study_timer"
+    (a) => a.automation_type !== "screen_time"
   );
   const dueToday = taskActivities.filter((a) => isDueOn(a, today));
 
@@ -281,11 +280,8 @@ export default async function DashboardPage() {
     .sort((a, b) => (msUntilDeadline(a, now) ?? Infinity) - (msUntilDeadline(b, now) ?? Infinity));
   const completedToday = dueToday.filter((a) => completionByActivity.get(a.id)?.completed);
 
-  // Routes each due-today activity to its card: LeetCode POTD and GFG POTD
-  // get their themed cards (components/leetcode-card.tsx,
-  // components/gfg-card.tsx), everything else still gets the shared
-  // ActivityRow — until each automation type gets its own redesign in a
-  // later turn.
+  // Routes each due-today activity to its card: LeetCode POTD, GFG POTD, and
+  // Study Timer get their themed cards; everything else gets ActivityRow.
   function renderActivityCard(activity: Activity) {
     const completion = completionByActivity.get(activity.id) ?? null;
     const heatmap = heatmapByActivity.get(activity.id) ?? [];
@@ -316,6 +312,20 @@ export default async function DashboardPage() {
           heatmapCompletions={heatmap}
           gfgUsername={config?.gfg_username ?? null}
           difficulty={config?.last_difficulty ?? null}
+        />
+      );
+    }
+
+    if (activity.automation_type === "study_timer") {
+      return (
+        <StudyTimerCard
+          key={activity.id}
+          activity={activity}
+          completion={completion}
+          periodKey={key}
+          heatmapCompletions={heatmap}
+          runningSince={studyTimerConfig?.running_since ?? null}
+          baseMinutes={studyTimerBaseMinutes}
         />
       );
     }
@@ -379,26 +389,6 @@ export default async function DashboardPage() {
               id: "permanent-stopwatch",
               node: <PermanentStopwatchCard />,
             },
-            ...(studyTimerActivity
-              ? [
-                  {
-                    id: "study-timer",
-                    node: (
-                      <StudyTimerCard
-                        activityId={studyTimerActivity.id}
-                        activityName={studyTimerActivity.name}
-                        activityIcon={studyTimerActivity.icon}
-                        goalMinutes={studyTimerActivity.target_value}
-                        runningSince={studyTimerConfig?.running_since ?? null}
-                        baseMinutes={studyTimerBaseMinutes}
-                        notifyOnGoal={studyTimerConfig?.notify_on_goal ?? true}
-                        activity={studyTimerActivity}
-                        heatmapCompletions={studyTimerHeatmap}
-                      />
-                    ),
-                  },
-                ]
-              : []),
             ...activeStopwatches.map((sw) => ({
               id: `quick-stopwatch-${sw.id}`,
               node: (
