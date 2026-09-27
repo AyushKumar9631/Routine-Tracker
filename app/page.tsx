@@ -8,6 +8,7 @@ import { AddActivityDialog } from "@/components/add-activity-dialog";
 import { ScreenTimeTodayCard } from "@/components/screentime-today-card";
 import { StudyTimerCard } from "@/components/study-timer-card";
 import { TodayTopCards } from "@/components/today-top-cards";
+import { PermanentStopwatchCard } from "@/components/permanent-stopwatch-card";
 import { QuickStopwatchButton } from "@/components/quick-stopwatch-button";
 import { QuickStopwatchRow } from "@/components/quick-stopwatch-row";
 import { QuickStopwatchCompletedRow } from "@/components/quick-stopwatch-completed-row";
@@ -374,6 +375,10 @@ export default async function DashboardPage() {
                   },
                 ]
               : []),
+            {
+              id: "permanent-stopwatch",
+              node: <PermanentStopwatchCard />,
+            },
             ...(studyTimerActivity
               ? [
                   {
