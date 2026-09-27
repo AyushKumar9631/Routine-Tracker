@@ -84,20 +84,19 @@ function VerticalSpeedometer({ percentage, isDark }: { percentage: number; isDar
   const bars = 10;
   const filledBars = Math.floor((percentage / 100) * bars);
   const maxWidth = 80;
-  const minWidth = 20;
 
   return (
     <div className="relative" style={{ width: `${maxWidth}px`, height: '100px' }}>
       <svg width={maxWidth} height="100" viewBox={`0 0 ${maxWidth} 100`}>
         <defs>
-          {/* Clip path with arc cuts on left (smaller) and right (larger) */}
+          {/* Clip path with both arcs facing left (curving inward) */}
           <clipPath id="speedometer-clip">
             <path
               d={`
                 M 0 0
                 Q 15 50 0 100
                 L ${maxWidth} 100
-                Q ${maxWidth - 25} 50 ${maxWidth} 0
+                Q ${maxWidth - 30} 50 ${maxWidth} 0
                 Z
               `}
             />
