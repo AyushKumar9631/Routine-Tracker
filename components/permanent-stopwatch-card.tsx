@@ -107,22 +107,28 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, o
           const shouldBlink = i === nextSegmentToBeFilled && isRunning;
           const isHovered = hoveredIndex === i;
 
+          // Determine color for blinking segment
+          let blinkColor = colors.cyan;
+          if (i >= 16) blinkColor = colors.orange;
+          else if (i >= 8) blinkColor = colors.blue;
+
           return (
             <g key={i}>
               <path
                 d={createSegmentPath(segmentStart, segmentEnd)}
-                fill={fillColor}
-                stroke={strokeColor}
+                fill={shouldBlink ? blinkColor : fillColor}
+                stroke={shouldBlink ? blinkColor : strokeColor}
                 strokeWidth="1"
                 className={cn(
-                  "transition-all duration-300 cursor-pointer",
-                  shouldBlink && "animate-pulse"
+                  "transition-all duration-300 cursor-pointer"
                 )}
                 style={{
                   transformOrigin: `${CX}px ${CY}px`,
                   transform: isHovered ? "scale(1.05)" : "scale(1)",
-                  opacity: 0,
-                  animation: `fadeIn 0.35s ease-out ${i * 0.02}s forwards`,
+                  opacity: shouldBlink ? undefined : 0,
+                  animation: shouldBlink
+                    ? `fadeIn 0.35s ease-out ${i * 0.02}s forwards, segment-blink 1.2s ease-in-out infinite`
+                    : `fadeIn 0.35s ease-out ${i * 0.02}s forwards`,
                 }}
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}

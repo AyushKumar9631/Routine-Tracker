@@ -74,6 +74,14 @@
       box-shadow: 0 0 0 0 rgba(176, 124, 44, 0);
     }
   }
+  @keyframes segment-blink {
+    0%, 100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
 
   .animate-heat-pop {
     animation: heat-pop 0.35s ease-out backwards;
