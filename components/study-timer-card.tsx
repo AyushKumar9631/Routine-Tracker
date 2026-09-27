@@ -79,57 +79,48 @@ function formatTimeRemaining(seconds: number): string {
   return seconds < 0 ? `-${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
 }
 
-/** Vertical speedometer with stacked curved bars */
+/** Vertical speedometer with stacked curved bars - tapered shape */
 function VerticalSpeedometer({ percentage, isDark }: { percentage: number; isDark: boolean }) {
   const bars = 10;
   const filledBars = Math.floor((percentage / 100) * bars);
 
   return (
-    <div className="flex flex-col-reverse items-center gap-1" style={{ width: '80px' }}>
+    <div className="flex flex-col-reverse items-end gap-1" style={{ width: '100px' }}>
       {Array.from({ length: bars }).map((_, i) => {
         const isFilled = i < filledBars;
-        const barWidth = 40 + i * 4; // increasing width from bottom to top
+        // Width decreases as we go up (0 = bottom/widest, 9 = top/narrowest)
+        const barWidth = 100 - i * 8; // 100px at bottom, 28px at top
+        const barHeight = 6;
 
         return (
-          <svg
+          <div
             key={i}
-            width={barWidth}
-            height="8"
-            viewBox={`0 0 ${barWidth} 8`}
-            className="transition-all duration-300"
+            className="relative transition-all duration-300"
             style={{
+              width: `${barWidth}px`,
+              height: `${barHeight}px`,
               opacity: 0,
               animation: `fadeIn 0.35s ease-out ${i * 0.04}s forwards`,
             }}
           >
-            <defs>
-              <clipPath id={`curve-clip-${i}`}>
-                <path
-                  d={`
-                    M 0 0
-                    L ${barWidth - 4} 0
-                    Q ${barWidth} 0 ${barWidth} 4
-                    Q ${barWidth} 8 ${barWidth - 4} 8
-                    L 4 8
-                    Q 0 8 0 4
-                    Q 0 0 4 0
-                    Z
-                  `}
-                />
-              </clipPath>
-            </defs>
-            <rect
-              x="0"
-              y="0"
+            <svg
               width={barWidth}
-              height="8"
-              rx="4"
-              fill={isFilled ? ACCENT : (isDark ? "#3A3A3A" : "#E5E5E5")}
-              stroke={isFilled ? ACCENT : (isDark ? "#4A4A4A" : "#D5D5D5")}
-              strokeWidth="1"
-              clipPath={`url(#curve-clip-${i})`}
-            />
-          </svg>
+              height={barHeight}
+              viewBox={`0 0 ${barWidth} ${barHeight}`}
+              className="w-full h-full"
+            >
+              <rect
+                x="0"
+                y="0"
+                width={barWidth}
+                height={barHeight}
+                rx="2"
+                fill={isFilled ? ACCENT : (isDark ? "#3A3A3A" : "#E5E5E5")}
+                stroke={isFilled ? ACCENT : (isDark ? "#4A4A4A" : "#D5D5D5")}
+                strokeWidth="0.5"
+              />
+            </svg>
+          </div>
         );
       })}
     </div>
@@ -324,7 +315,7 @@ export function StudyTimerCard({
         "dark:border-[#3A3A3A] dark:bg-[#1A1A1A] dark:text-white",
         isRunning && "ring-pulse-moss"
       )}
-      style={{ fontFamily: STUDY_FONT, width: isDone ? undefined : '360px', maxWidth: '100%' }}
+      style={{ fontFamily: STUDY_FONT }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
@@ -356,9 +347,6 @@ export function StudyTimerCard({
           >
             {formatTimeRemaining(remaining)}
           </div>
-          <p className="mt-1 text-xs text-[#8A8A8A]">
-            {goalReached ? "overtime counting" : "time remaining"}
-          </p>
 
           <button
             type="button"
@@ -379,7 +367,7 @@ export function StudyTimerCard({
         </div>
 
         {!isDone && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-end">
             <VerticalSpeedometer
               percentage={percentage}
               isDark={false}
@@ -389,7 +377,6 @@ export function StudyTimerCard({
       </div>
 
       <div className="mt-5 pt-4 border-t border-[#E5E5E5] dark:border-[#3A3A3A]">
-        <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-[#8A8A8A]">Last 14 days</p>
         <div
           key={`sweep-${sweepRun}`}
           className="flex items-center gap-1.5"
@@ -416,6 +403,7 @@ export function StudyTimerCard({
                 style={{
                   animationDelay: `${i * 50}ms`,
                   color: "#E5E5E5",
+                  transform: `skewX(-8deg)`,
                 }}
               />
             );
