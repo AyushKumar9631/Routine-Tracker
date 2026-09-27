@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { startStudyTimer, stopStudyTimer } from "@/actions/study-timer";
 import type { Activity, Completion } from "@/lib/types";
 import { calcStreak, cn, formatDateKey, isImageIcon, parseDateKey } from "@/lib/utils";
 
@@ -61,6 +62,23 @@ function last14Days(completions: Completion[], todayDateKey: string) {
   return days;
 }
 
+function liveElapsedSeconds(startedAt: string | null, nowMs: number): number {
+  if (!startedAt) return 0;
+  const started = new Date(startedAt).getTime();
+  return Math.floor((nowMs - started) / 1000);
+}
+
+function formatTimeRemaining(seconds: number): string {
+  const absSeconds = Math.abs(seconds);
+  const h = Math.floor(absSeconds / 3600);
+  const m = Math.floor((absSeconds % 3600) / 60);
+  const s = absSeconds % 60;
+  const hh = String(h).padStart(2, "0");
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  return seconds < 0 ? `-${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+}
+
 export function StudyTimerCard({
   activity,
   completion,
@@ -79,6 +97,13 @@ export function StudyTimerCard({
   const isDone = completion?.completed ?? false;
   const streak = calcStreak(activity, heatmapCompletions);
   const days = last14Days(heatmapCompletions, periodKey);
+  const goalMinutes = activity.target_value ?? 0;
+
+  const [localRunningSince, setLocalRunningSince] = useState(runningSince);
+  const [localBaseMinutes, setLocalBaseMinutes] = useState(baseMinutes);
+  const [tick, setTick] = useState<number | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   const cardRef = useRef<HTMLLIElement>(null);
   const [sweepRun, setSweepRun] = useState(0);
@@ -95,6 +120,50 @@ export function StudyTimerCard({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!localRunningSince) {
+      setTick(null);
+      return;
+    }
+    const update = () => setTick(Date.now());
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [localRunningSince]);
+
+  const goalSeconds = goalMinutes * 60;
+  const liveSeconds = tick === null ? 0 : liveElapsedSeconds(localRunningSince, tick);
+  const studiedSeconds = localBaseMinutes * 60 + liveSeconds;
+  const remaining = goalSeconds - studiedSeconds;
+
+  function handleStart() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const config = await startStudyTimer(activity.id);
+        setLocalRunningSince(config.running_since);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't start the timer");
+      }
+    });
+  }
+
+  function handleStop() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const result = await stopStudyTimer(activity.id);
+        setLocalBaseMinutes(result.totalMinutes);
+        setLocalRunningSince(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't stop the timer");
+      }
+    });
+  }
+
+  const isRunning = Boolean(localRunningSince);
+  const goalReached = remaining <= 0;
 
   return (
     <li
@@ -127,6 +196,35 @@ export function StudyTimerCard({
           <span className="text-lg font-extrabold tabular-nums">{streak}</span>
         </div>
       </div>
+
+      <div className="mt-5 flex items-center gap-4">
+        <div
+          className="text-4xl font-bold tabular-nums"
+          style={{
+            fontVariantNumeric: "tabular-nums",
+            color: goalReached ? ACCENT : (isRunning ? "inherit" : "#8A8A8A")
+          }}
+        >
+          {formatTimeRemaining(remaining)}
+        </div>
+
+        <button
+          type="button"
+          onClick={isRunning ? handleStop : handleStart}
+          disabled={isPending || !goalMinutes}
+          className={cn(
+            "rounded-lg px-6 py-2 text-sm font-semibold transition-all duration-200 hover:opacity-90 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100",
+            isRunning ? "bg-rust text-white" : "bg-moss text-white"
+          )}
+        >
+          {isPending ? "…" : isRunning ? "Stop" : "Start"}
+        </button>
+      </div>
+
+      {!goalMinutes && (
+        <p className="mt-2 text-xs text-rust">Set a daily goal to start the timer.</p>
+      )}
+      {error && <p className="mt-2 text-xs text-rust">{error}</p>}
 
       <div className="mt-5 flex items-end justify-between gap-4">
         <div
