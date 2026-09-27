@@ -42,6 +42,7 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, o
   const percentage = Math.min((totalSeconds / MAX_SECONDS) * 100, 100);
   const filledSegments = Math.floor((percentage / 100) * SEGMENT_COUNT);
   const nextSegmentToBeFilled = filledSegments < SEGMENT_COUNT ? filledSegments : -1;
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const CX = 100;
   const CY = 100;
@@ -84,22 +85,27 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, o
 
           let fillColor = colors.card;
           let strokeColor = isDark ? "#3C3C3E" : "#D5D5DA";
+          let opacity = 0.3;
 
           if (i < filledSegments) {
-            // Color segments like screen time: cyan -> blue -> orange
+            // 0-33% (0-7): cyan, 33-66% (8-15): blue, 66-100% (16-23): orange
             if (i < 8) {
               fillColor = colors.cyan;
               strokeColor = colors.cyan;
+              opacity = 1;
             } else if (i < 16) {
               fillColor = colors.blue;
               strokeColor = colors.blue;
+              opacity = 1;
             } else {
               fillColor = colors.orange;
               strokeColor = colors.orange;
+              opacity = 1;
             }
           }
 
           const shouldBlink = i === nextSegmentToBeFilled && isRunning;
+          const isHovered = hoveredIndex === i;
 
           return (
             <g key={i}>
@@ -108,12 +114,21 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, o
                 fill={fillColor}
                 stroke={strokeColor}
                 strokeWidth="1"
-                className={cn(shouldBlink && "animate-pulse")}
+                className={cn(
+                  "transition-all duration-300 cursor-pointer",
+                  shouldBlink && "animate-pulse"
+                )}
                 style={{
+                  transformOrigin: `${CX}px ${CY}px`,
+                  transform: isHovered ? "scale(1.05)" : "scale(1)",
                   opacity: 0,
                   animation: `fadeIn 0.35s ease-out ${i * 0.02}s forwards`,
                 }}
-              />
+                onMouseEnter={() => setHoveredIndex(i)}
+                onMouseLeave={() => setHoveredIndex(null)}
+              >
+                <title>{`${Math.round(((i + 1) / 24) * 100)}%`}</title>
+              </path>
             </g>
           );
         })}
@@ -124,7 +139,7 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, o
               cx={CX}
               cy={CY}
               r="45"
-              fill={startDisabled ? colors.textSoft : colors.cyan}
+              fill={startDisabled ? colors.textSoft : colors.blue}
               className={cn("cursor-pointer transition-all", !startDisabled && "hover:opacity-90")}
               onClick={!startDisabled ? onStartClick : undefined}
               style={{ opacity: startDisabled ? 0.4 : 1 }}
@@ -274,9 +289,9 @@ export function PermanentStopwatchCard() {
               className="w-full rounded-lg border px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2"
               style={{
                 backgroundColor: isDark ? "#2C2C2E" : "#FFFFFF",
-                borderColor: topicName.trim() ? colors.cyan : (isDark ? "#3C3C3E" : "#D5D5DA"),
+                borderColor: topicName.trim() ? colors.orange : (isDark ? "#3C3C3E" : "#D5D5DA"),
                 color: colors.text,
-                boxShadow: topicName.trim() ? `0 0 0 1px ${colors.cyan}` : 'none',
+                boxShadow: topicName.trim() ? `0 0 0 1px ${colors.orange}` : 'none',
               }}
             />
           </div>
@@ -297,7 +312,7 @@ export function PermanentStopwatchCard() {
               disabled={isPending}
               className="rounded-full px-6 py-2.5 text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
               style={{
-                backgroundColor: status === "running" ? colors.orange : colors.cyan,
+                backgroundColor: colors.blue,
                 color: "#FFFFFF",
               }}
             >
