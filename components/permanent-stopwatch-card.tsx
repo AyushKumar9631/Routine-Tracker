@@ -48,7 +48,7 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, o
   const CY = 100;
   const R = 70;
   const SEGMENT_ANGLE = 360 / SEGMENT_COUNT;
-  const GAP = 2;
+  const GAP = 3;
 
   const polarToCartesian = (angle: number, radius: number) => {
     const rad = ((angle - 90) * Math.PI) / 180;
