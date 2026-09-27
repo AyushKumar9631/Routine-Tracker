@@ -269,7 +269,7 @@ export function PermanentStopwatchCard() {
       }}
     >
       <div className="mb-4 flex items-center gap-3">
-        <img src="/stopwatch-icon.svg" alt="" className="w-5 h-5" style={{ filter: isDark ? 'invert(1)' : 'invert(0)' }} />
+        <img src="/stopwatch-icon.svg" alt="" className="w-5 h-5" />
         <span className="text-base font-medium" style={{ color: colors.text }}>
           {isActive ? topicName : "Stopwatch"}
         </span>
@@ -295,9 +295,9 @@ export function PermanentStopwatchCard() {
               className="w-full rounded-lg border px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2"
               style={{
                 backgroundColor: isDark ? "#2C2C2E" : "#FFFFFF",
-                borderColor: topicName.trim() ? colors.orange : (isDark ? "#3C3C3E" : "#D5D5DA"),
+                borderColor: topicName.trim() ? colors.cyan : (isDark ? "#3C3C3E" : "#D5D5DA"),
                 color: colors.text,
-                boxShadow: topicName.trim() ? `0 0 0 1px ${colors.orange}` : 'none',
+                boxShadow: topicName.trim() ? `0 0 0 1px ${colors.cyan}` : 'none',
               }}
             />
           </div>
