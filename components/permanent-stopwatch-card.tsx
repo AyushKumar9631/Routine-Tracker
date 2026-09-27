@@ -29,9 +29,12 @@ interface CircularStopwatchProps {
   totalSeconds: number;
   isRunning: boolean;
   isDark: boolean;
+  showStartButton?: boolean;
+  onStartClick?: () => void;
+  startDisabled?: boolean;
 }
 
-function CircularStopwatch({ totalSeconds, isRunning, isDark }: CircularStopwatchProps) {
+function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, onStartClick, startDisabled }: CircularStopwatchProps) {
   const colors = isDark ? SCREENTIME_COLORS.dark : SCREENTIME_COLORS.light;
   const percentage = Math.min((totalSeconds / MAX_SECONDS) * 100, 100);
   const filledSegments = Math.floor((percentage / 100) * SEGMENT_COUNT);
@@ -70,15 +73,14 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark }: CircularStopwatc
   };
 
   return (
-    <div className="relative w-full max-w-[220px] min-h-[180px] flex items-center justify-center">
-      <svg viewBox="0 0 200 200" className="w-full" aria-hidden="true">
+    <div className="relative w-full flex items-center justify-center" style={{ minHeight: '280px' }}>
+      <svg viewBox="0 0 200 200" className="w-full max-w-[240px]" aria-hidden="true">
         {Array.from({ length: SEGMENT_COUNT }).map((_, i) => {
           const segmentStart = i * SEGMENT_ANGLE + (i > 0 ? GAP / 2 : 0);
           const segmentEnd = (i + 1) * SEGMENT_ANGLE - GAP / 2;
 
           let fillColor = colors.card;
           let strokeColor = isDark ? "#3C3C3E" : "#D5D5DA";
-          let opacity = 1;
 
           if (i < filledSegments) {
             fillColor = colors.cyan;
@@ -104,20 +106,47 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark }: CircularStopwatc
           );
         })}
 
-        <text
-          x={CX}
-          y={CY + 5}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className="font-mono font-semibold"
-          style={{
-            fontSize: "36px",
-            fill: colors.text,
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          {formatStudyClock(totalSeconds)}
-        </text>
+        {showStartButton ? (
+          <g>
+            <circle
+              cx={CX}
+              cy={CY}
+              r="50"
+              fill={startDisabled ? colors.textSoft : colors.blue}
+              className={cn("cursor-pointer transition-all", !startDisabled && "hover:opacity-90")}
+              onClick={!startDisabled ? onStartClick : undefined}
+              style={{ opacity: startDisabled ? 0.4 : 1 }}
+            />
+            <text
+              x={CX}
+              y={CY + 5}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="font-semibold pointer-events-none"
+              style={{
+                fontSize: "20px",
+                fill: "#FFFFFF",
+              }}
+            >
+              Start
+            </text>
+          </g>
+        ) : (
+          <text
+            x={CX}
+            y={CY + 5}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="font-mono font-semibold"
+            style={{
+              fontSize: "36px",
+              fill: colors.text,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {formatStudyClock(totalSeconds)}
+          </text>
+        )}
       </svg>
     </div>
   );
@@ -133,7 +162,6 @@ export function PermanentStopwatchCard() {
   const [runningSince, setRunningSince] = useState<string | null>(null);
   const [tick, setTick] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     setIsDark(document.documentElement.classList.contains("dark"));
@@ -201,24 +229,32 @@ export function PermanentStopwatchCard() {
 
   return (
     <div
-      className="stopwatch-card mb-6 rounded-xl border p-6 transition-all duration-300"
+      className="stopwatch-card rounded-xl border p-6 transition-all duration-300"
       style={{
         backgroundColor: colors.card,
         borderColor: isDark ? "#2C2C2E" : "#E5E5EA",
+        minHeight: '480px',
       }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
-      {!isActive ? (
-        <div className="flex flex-col items-center gap-6 py-4">
-          <div className="relative w-full max-w-[220px]">
-            <div className="absolute inset-0 flex items-center justify-center opacity-10">
-              <img src="/stopwatch-icon.svg" alt="" className="w-32 h-32" />
-            </div>
-            <CircularStopwatch totalSeconds={0} isRunning={false} isDark={isDark} />
-          </div>
+      <div className="mb-4 flex items-center gap-3">
+        <img src="/stopwatch-icon.svg" alt="" className="w-5 h-5" style={{ filter: isDark ? 'invert(1)' : 'invert(0)' }} />
+        <span className="text-base font-medium" style={{ color: colors.text }}>
+          {isActive ? topicName : "Stopwatch"}
+        </span>
+      </div>
 
-          <div className="w-full max-w-[280px] space-y-4">
+      {!isActive ? (
+        <div className="flex flex-col items-center" style={{ minHeight: '380px' }}>
+          <CircularStopwatch
+            totalSeconds={0}
+            isRunning={false}
+            isDark={isDark}
+            showStartButton={true}
+            onStartClick={handleStart}
+            startDisabled={!topicName.trim()}
+          />
+
+          <div className="w-full max-w-[280px] mt-4">
             <input
               type="text"
               value={topicName}
@@ -231,64 +267,40 @@ export function PermanentStopwatchCard() {
                 color: colors.text,
               }}
             />
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center" style={{ minHeight: '380px' }}>
+          <CircularStopwatch
+            totalSeconds={totalSeconds}
+            isRunning={status === "running"}
+            isDark={isDark}
+            showStartButton={false}
+          />
 
+          <div className="flex gap-3 mt-6">
             <button
-              onClick={handleStart}
-              disabled={!topicName.trim()}
-              className="w-full rounded-full py-4 text-base font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
+              onClick={handleToggle}
+              disabled={isPending}
+              className="rounded-full px-6 py-3 text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+              style={{
+                backgroundColor: isDark ? "#2C2C2E" : "#E5E5EA",
+                color: colors.text,
+              }}
+            >
+              {status === "running" ? "Pause" : "Resume"}
+            </button>
+            <button
+              onClick={handleComplete}
+              disabled={isPending}
+              className="rounded-full px-6 py-3 text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
               style={{
                 backgroundColor: colors.blue,
                 color: "#FFFFFF",
               }}
             >
-              Start
+              Complete
             </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-6">
-          <div className="flex items-center gap-3">
-            <div
-              className="h-3 w-3 rounded-full"
-              style={{ backgroundColor: status === "running" ? colors.cyan : colors.textSoft }}
-            />
-            <span className="text-sm font-medium" style={{ color: colors.text }}>
-              {topicName}
-            </span>
-          </div>
-
-          <div className="flex flex-col items-center gap-6">
-            <div className="relative w-full max-w-[220px]">
-              <div className="absolute inset-0 flex items-center justify-center opacity-10">
-                <img src="/stopwatch-icon.svg" alt="" className="w-32 h-32" />
-              </div>
-              <CircularStopwatch totalSeconds={totalSeconds} isRunning={status === "running"} isDark={isDark} />
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={handleToggle}
-                disabled={isPending}
-                className="rounded-full px-6 py-3 text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                style={{
-                  backgroundColor: isDark ? "#2C2C2E" : "#E5E5EA",
-                  color: colors.text,
-                }}
-              >
-                {status === "running" ? "Pause" : "Resume"}
-              </button>
-              <button
-                onClick={handleComplete}
-                disabled={isPending}
-                className="rounded-full px-6 py-3 text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                style={{
-                  backgroundColor: colors.blue,
-                  color: "#FFFFFF",
-                }}
-              >
-                Complete
-              </button>
-            </div>
           </div>
         </div>
       )}
