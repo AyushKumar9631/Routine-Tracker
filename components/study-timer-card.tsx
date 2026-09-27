@@ -79,6 +79,37 @@ function formatTimeRemaining(seconds: number): string {
   return seconds < 0 ? `-${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
 }
 
+/** Vertical completion tracker - diagonal stacked bars */
+function CompletionTracker({ percentage }: { percentage: number }) {
+  const bars = 10;
+  const filledBars = Math.floor((percentage / 100) * bars);
+  const maxWidth = 60;
+  const minWidth = 10;
+
+  return (
+    <div className="flex flex-col gap-[3px]">
+      {Array.from({ length: bars }).map((_, i) => {
+        const isFilled = i < filledBars;
+        // Top bar is widest, bottom bar is narrowest (diagonal right edge)
+        const barWidth = maxWidth - (i * (maxWidth - minWidth)) / (bars - 1);
+
+        return (
+          <div
+            key={i}
+            style={{
+              width: `${barWidth}px`,
+              height: '6px',
+              backgroundColor: isFilled ? ACCENT : '#3A3A3A',
+              opacity: 0,
+              animation: `fadeIn 0.35s ease-out ${i * 0.04}s forwards`,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function StudyTimerCard({
   activity,
   completion,
@@ -164,6 +195,7 @@ export function StudyTimerCard({
 
   const isRunning = Boolean(localRunningSince);
   const goalReached = remaining <= 0;
+  const percentage = goalSeconds > 0 ? Math.min(100, Math.max(0, (studiedSeconds / goalSeconds) * 100)) : 0;
 
   return (
     <li
@@ -197,28 +229,32 @@ export function StudyTimerCard({
         </div>
       </div>
 
-      <div className="mt-5 flex items-center gap-4">
-        <div
-          className="text-4xl font-bold tabular-nums"
-          style={{
-            fontVariantNumeric: "tabular-nums",
-            color: goalReached ? ACCENT : (isRunning ? "inherit" : "#8A8A8A")
-          }}
-        >
-          {formatTimeRemaining(remaining)}
+      <div className="mt-5 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div
+            className="text-4xl font-bold tabular-nums"
+            style={{
+              fontVariantNumeric: "tabular-nums",
+              color: goalReached ? ACCENT : (isRunning ? "inherit" : "#8A8A8A")
+            }}
+          >
+            {formatTimeRemaining(remaining)}
+          </div>
+
+          <button
+            type="button"
+            onClick={isRunning ? handleStop : handleStart}
+            disabled={isPending || !goalMinutes}
+            className={cn(
+              "rounded-lg px-6 py-2 text-sm font-semibold transition-all duration-200 hover:opacity-90 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100",
+              isRunning ? "bg-rust text-white" : "bg-moss text-white"
+            )}
+          >
+            {isPending ? "…" : isRunning ? "Stop" : "Start"}
+          </button>
         </div>
 
-        <button
-          type="button"
-          onClick={isRunning ? handleStop : handleStart}
-          disabled={isPending || !goalMinutes}
-          className={cn(
-            "rounded-lg px-6 py-2 text-sm font-semibold transition-all duration-200 hover:opacity-90 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100",
-            isRunning ? "bg-rust text-white" : "bg-moss text-white"
-          )}
-        >
-          {isPending ? "…" : isRunning ? "Stop" : "Start"}
-        </button>
+        {!isDone && <CompletionTracker percentage={percentage} />}
       </div>
 
       {!goalMinutes && (
