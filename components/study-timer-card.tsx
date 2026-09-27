@@ -13,6 +13,8 @@ const ACCENT_GLOW = "rgba(63, 107, 71, 0.6)";
 const STUDY_FONT =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
+const STOPWATCH_LOGO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233F6B47' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13' r='8'/%3E%3Cpath d='M12 9v4l2 2'/%3E%3Cpath d='M8 3h8'/%3E%3Cpath d='M12 3v2'/%3E%3C/svg%3E";
+
 function StudyTimerMark({ icon, className }: { icon?: string | null; className?: string }) {
   if (icon && isImageIcon(icon)) {
     return (
@@ -29,13 +31,13 @@ function StudyTimerMark({ icon, className }: { icon?: string | null; className?:
   return (
     <span
       className={cn(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-black text-white",
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg p-1.5",
         className
       )}
       style={{ background: `linear-gradient(135deg, ${ACCENT}, #2A4A30)` }}
       aria-hidden="true"
     >
-      ST
+      <img src={STOPWATCH_LOGO} alt="" className="h-full w-full" />
     </span>
   );
 }
@@ -77,37 +79,6 @@ function formatTimeRemaining(seconds: number): string {
   const mm = String(m).padStart(2, "0");
   const ss = String(s).padStart(2, "0");
   return seconds < 0 ? `-${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
-}
-
-/** Vertical completion tracker - diagonal stacked bars */
-function CompletionTracker({ percentage }: { percentage: number }) {
-  const bars = 10;
-  const filledBars = Math.floor((percentage / 100) * bars);
-  const maxWidth = 60;
-  const minWidth = 10;
-
-  return (
-    <div className="flex flex-col gap-[3px]">
-      {Array.from({ length: bars }).map((_, i) => {
-        const isFilled = i < filledBars;
-        // Top bar is widest, bottom bar is narrowest (diagonal right edge)
-        const barWidth = maxWidth - (i * (maxWidth - minWidth)) / (bars - 1);
-
-        return (
-          <div
-            key={i}
-            style={{
-              width: `${barWidth}px`,
-              height: '6px',
-              backgroundColor: isFilled ? ACCENT : '#3A3A3A',
-              opacity: 0,
-              animation: `fadeIn 0.35s ease-out ${i * 0.04}s forwards`,
-            }}
-          />
-        );
-      })}
-    </div>
-  );
 }
 
 export function StudyTimerCard({
@@ -195,15 +166,15 @@ export function StudyTimerCard({
 
   const isRunning = Boolean(localRunningSince);
   const goalReached = remaining <= 0;
-  const percentage = goalSeconds > 0 ? Math.min(100, Math.max(0, (studiedSeconds / goalSeconds) * 100)) : 0;
 
   return (
     <li
       ref={cardRef}
       className={cn(
-        "group relative mb-4 overflow-hidden rounded-2xl border p-5 lg:mb-0",
+        "group relative mb-4 overflow-hidden rounded-xl border p-6 lg:mb-0 transition-all duration-300 hover:shadow-lg",
         "border-[#E5E5E5] bg-white text-[#262626]",
-        "dark:border-[#3A3A3A] dark:bg-[#1A1A1A] dark:text-white"
+        "dark:border-[#3A3A3A] dark:bg-[#1A1A1A] dark:text-white",
+        "hover:border-moss/40 dark:hover:border-moss/40"
       )}
       style={{ fontFamily: STUDY_FONT }}
     >
@@ -229,32 +200,28 @@ export function StudyTimerCard({
         </div>
       </div>
 
-      <div className="mt-5 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div
-            className="text-4xl font-bold tabular-nums"
-            style={{
-              fontVariantNumeric: "tabular-nums",
-              color: goalReached ? ACCENT : (isRunning ? "inherit" : "#8A8A8A")
-            }}
-          >
-            {formatTimeRemaining(remaining)}
-          </div>
-
-          <button
-            type="button"
-            onClick={isRunning ? handleStop : handleStart}
-            disabled={isPending || !goalMinutes}
-            className={cn(
-              "rounded-lg px-6 py-2 text-sm font-semibold transition-all duration-200 hover:opacity-90 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100",
-              isRunning ? "bg-rust text-white" : "bg-moss text-white"
-            )}
-          >
-            {isPending ? "…" : isRunning ? "Stop" : "Start"}
-          </button>
+      <div className="mt-5 flex items-center gap-4 group/timer">
+        <div
+          className="text-4xl font-bold tabular-nums transition-all duration-300 group-hover/timer:scale-105"
+          style={{
+            fontVariantNumeric: "tabular-nums",
+            color: goalReached ? ACCENT : (isRunning ? "inherit" : "#8A8A8A")
+          }}
+        >
+          {formatTimeRemaining(remaining)}
         </div>
 
-        {!isDone && <CompletionTracker percentage={percentage} />}
+        <button
+          type="button"
+          onClick={isRunning ? handleStop : handleStart}
+          disabled={isPending || !goalMinutes}
+          className={cn(
+            "rounded-lg px-6 py-2 text-sm font-semibold transition-all duration-200 hover:opacity-90 hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-md hover:shadow-lg",
+            isRunning ? "bg-rust text-white" : "bg-moss text-white"
+          )}
+        >
+          {isPending ? "…" : isRunning ? "Stop" : "Start"}
+        </button>
       </div>
 
       {!goalMinutes && (
@@ -270,6 +237,7 @@ export function StudyTimerCard({
         >
           {days.map((d, i) => {
             const isToday = i === days.length - 1;
+            const nextToFill = !d.done && i > 0 && days[i - 1].done;
             const stagger = i * 55;
             const sweepClass =
               sweepRun === 0 ? null : isToday && !d.done ? "tally-sweep-today" : d.done ? "tally-sweep-fill" : "tally-sweep-empty";
@@ -278,8 +246,9 @@ export function StudyTimerCard({
                 key={d.key}
                 title={d.key}
                 className={cn(
-                  "h-7 w-2 skew-x-[-12deg] text-[#262626]/10 transition-all duration-300 dark:text-white/10",
+                  "h-7 w-2 skew-x-[-12deg] text-[#262626]/10 transition-all duration-300 dark:text-white/10 hover:scale-110",
                   d.done ? "bg-moss shadow-[0_0_6px_rgba(63,107,71,0.6)]" : "bg-current",
+                  nextToFill && "animate-pulse",
                   sweepClass
                 )}
                 style={
