@@ -12,6 +12,7 @@ const SCREENTIME_COLORS = {
     textSoft: "#8E8E93",
     cyan: "#32ADE6",
     blue: "#007AFF",
+    orange: "#FF9500",
   },
   dark: {
     card: "#1C1C1E",
@@ -19,6 +20,7 @@ const SCREENTIME_COLORS = {
     textSoft: "#8E8E93",
     cyan: "#64D2FF",
     blue: "#0A84FF",
+    orange: "#FF9F0A",
   },
 };
 
@@ -32,9 +34,10 @@ interface CircularStopwatchProps {
   showStartButton?: boolean;
   onStartClick?: () => void;
   startDisabled?: boolean;
+  isPaused?: boolean;
 }
 
-function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, onStartClick, startDisabled }: CircularStopwatchProps) {
+function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, onStartClick, startDisabled, isPaused }: CircularStopwatchProps) {
   const colors = isDark ? SCREENTIME_COLORS.dark : SCREENTIME_COLORS.light;
   const percentage = Math.min((totalSeconds / MAX_SECONDS) * 100, 100);
   const filledSegments = Math.floor((percentage / 100) * SEGMENT_COUNT);
@@ -42,7 +45,7 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, o
 
   const CX = 100;
   const CY = 100;
-  const R = 80;
+  const R = 70;
   const SEGMENT_ANGLE = 360 / SEGMENT_COUNT;
   const GAP = 2;
 
@@ -73,8 +76,8 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, o
   };
 
   return (
-    <div className="relative w-full flex items-center justify-center" style={{ minHeight: '280px' }}>
-      <svg viewBox="0 0 200 200" className="w-full max-w-[240px]" aria-hidden="true">
+    <div className="relative w-full max-w-[200px]">
+      <svg viewBox="0 0 200 200" className="w-full" aria-hidden="true">
         {Array.from({ length: SEGMENT_COUNT }).map((_, i) => {
           const segmentStart = i * SEGMENT_ANGLE + (i > 0 ? GAP / 2 : 0);
           const segmentEnd = (i + 1) * SEGMENT_ANGLE - GAP / 2;
@@ -83,8 +86,17 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, o
           let strokeColor = isDark ? "#3C3C3E" : "#D5D5DA";
 
           if (i < filledSegments) {
-            fillColor = colors.cyan;
-            strokeColor = colors.cyan;
+            // Color segments like screen time: cyan -> blue -> orange
+            if (i < 8) {
+              fillColor = colors.cyan;
+              strokeColor = colors.cyan;
+            } else if (i < 16) {
+              fillColor = colors.blue;
+              strokeColor = colors.blue;
+            } else {
+              fillColor = colors.orange;
+              strokeColor = colors.orange;
+            }
           }
 
           const shouldBlink = i === nextSegmentToBeFilled && isRunning;
@@ -111,8 +123,8 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, o
             <circle
               cx={CX}
               cy={CY}
-              r="50"
-              fill={startDisabled ? colors.textSoft : colors.blue}
+              r="45"
+              fill={startDisabled ? colors.textSoft : colors.cyan}
               className={cn("cursor-pointer transition-all", !startDisabled && "hover:opacity-90")}
               onClick={!startDisabled ? onStartClick : undefined}
               style={{ opacity: startDisabled ? 0.4 : 1 }}
@@ -124,7 +136,7 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, o
               dominantBaseline="middle"
               className="font-semibold pointer-events-none"
               style={{
-                fontSize: "20px",
+                fontSize: "18px",
                 fill: "#FFFFFF",
               }}
             >
@@ -139,7 +151,7 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark, showStartButton, o
             dominantBaseline="middle"
             className="font-mono font-semibold"
             style={{
-              fontSize: "36px",
+              fontSize: "32px",
               fill: colors.text,
               fontVariantNumeric: "tabular-nums",
             }}
@@ -233,7 +245,6 @@ export function PermanentStopwatchCard() {
       style={{
         backgroundColor: colors.card,
         borderColor: isDark ? "#2C2C2E" : "#E5E5EA",
-        minHeight: '480px',
       }}
     >
       <div className="mb-4 flex items-center gap-3">
@@ -244,7 +255,7 @@ export function PermanentStopwatchCard() {
       </div>
 
       {!isActive ? (
-        <div className="flex flex-col items-center" style={{ minHeight: '380px' }}>
+        <div className="flex flex-col items-center gap-4">
           <CircularStopwatch
             totalSeconds={0}
             isRunning={false}
@@ -254,38 +265,40 @@ export function PermanentStopwatchCard() {
             startDisabled={!topicName.trim()}
           />
 
-          <div className="w-full max-w-[280px] mt-4">
+          <div className="w-full max-w-[240px]">
             <input
               type="text"
               value={topicName}
               onChange={(e) => setTopicName(e.target.value)}
               placeholder="What are you working on?"
-              className="w-full rounded-lg border px-4 py-3 text-sm transition-all"
+              className="w-full rounded-lg border px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2"
               style={{
                 backgroundColor: isDark ? "#2C2C2E" : "#FFFFFF",
-                borderColor: isDark ? "#3C3C3E" : "#D5D5DA",
+                borderColor: topicName.trim() ? colors.cyan : (isDark ? "#3C3C3E" : "#D5D5DA"),
                 color: colors.text,
+                boxShadow: topicName.trim() ? `0 0 0 1px ${colors.cyan}` : 'none',
               }}
             />
           </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center" style={{ minHeight: '380px' }}>
+        <div className="flex flex-col items-center gap-4">
           <CircularStopwatch
             totalSeconds={totalSeconds}
             isRunning={status === "running"}
             isDark={isDark}
             showStartButton={false}
+            isPaused={status === "paused"}
           />
 
-          <div className="flex gap-3 mt-6">
+          <div className="flex gap-3">
             <button
               onClick={handleToggle}
               disabled={isPending}
-              className="rounded-full px-6 py-3 text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+              className="rounded-full px-6 py-2.5 text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
               style={{
-                backgroundColor: isDark ? "#2C2C2E" : "#E5E5EA",
-                color: colors.text,
+                backgroundColor: status === "running" ? colors.orange : colors.cyan,
+                color: "#FFFFFF",
               }}
             >
               {status === "running" ? "Pause" : "Resume"}
@@ -293,7 +306,7 @@ export function PermanentStopwatchCard() {
             <button
               onClick={handleComplete}
               disabled={isPending}
-              className="rounded-full px-6 py-3 text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+              className="rounded-full px-6 py-2.5 text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
               style={{
                 backgroundColor: colors.blue,
                 color: "#FFFFFF",
