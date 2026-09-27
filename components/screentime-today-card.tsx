@@ -100,7 +100,7 @@ function SegmentedSpeedometer({
   const time = formatTimeCompact(minutes);
 
   return (
-    <div className="relative w-full max-w-[200px]">
+    <div className="relative w-full max-w-[200px] min-h-[180px] flex items-center justify-center">
       <svg viewBox="0 0 200 180" className="w-full" aria-hidden="true">
         {Array.from({ length: SEGMENT_COUNT }).map((_, i) => {
           const segmentStart = START_ANGLE + i * SEGMENT_ANGLE + (i > 0 ? GAP / 2 : 0);

@@ -133,6 +133,21 @@
 .dark .screentime-card:hover {
   box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
 }
+
+/*
+ * Stopwatch card (components/permanent-stopwatch-card.tsx) — matching hover
+ * animation as Screen Time card for visual consistency.
+ */
+.stopwatch-card {
+  transition: transform 300ms ease, box-shadow 300ms ease;
+}
+.stopwatch-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.12);
+}
+.dark .stopwatch-card:hover {
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
+}
 .gfg-card {
   transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease;
 }

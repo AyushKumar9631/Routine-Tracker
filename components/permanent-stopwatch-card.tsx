@@ -35,6 +35,7 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark }: CircularStopwatc
   const colors = isDark ? SCREENTIME_COLORS.dark : SCREENTIME_COLORS.light;
   const percentage = Math.min((totalSeconds / MAX_SECONDS) * 100, 100);
   const filledSegments = Math.floor((percentage / 100) * SEGMENT_COUNT);
+  const nextSegmentToBeFilled = filledSegments < SEGMENT_COUNT ? filledSegments : -1;
 
   const CX = 100;
   const CY = 100;
@@ -69,7 +70,7 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark }: CircularStopwatc
   };
 
   return (
-    <div className="relative w-full max-w-[220px]">
+    <div className="relative w-full max-w-[220px] min-h-[180px] flex items-center justify-center">
       <svg viewBox="0 0 200 200" className="w-full" aria-hidden="true">
         {Array.from({ length: SEGMENT_COUNT }).map((_, i) => {
           const segmentStart = i * SEGMENT_ANGLE + (i > 0 ? GAP / 2 : 0);
@@ -84,7 +85,7 @@ function CircularStopwatch({ totalSeconds, isRunning, isDark }: CircularStopwatc
             strokeColor = colors.cyan;
           }
 
-          const shouldBlink = i === filledSegments && isRunning;
+          const shouldBlink = i === nextSegmentToBeFilled && isRunning;
 
           return (
             <g key={i}>
@@ -132,6 +133,7 @@ export function PermanentStopwatchCard() {
   const [runningSince, setRunningSince] = useState<string | null>(null);
   const [tick, setTick] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     setIsDark(document.documentElement.classList.contains("dark"));
@@ -199,15 +201,22 @@ export function PermanentStopwatchCard() {
 
   return (
     <div
-      className="screentime-card mb-6 rounded-xl border p-6 transition-all duration-300"
+      className="stopwatch-card mb-6 rounded-xl border p-6 transition-all duration-300"
       style={{
         backgroundColor: colors.card,
         borderColor: isDark ? "#2C2C2E" : "#E5E5EA",
       }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {!isActive ? (
         <div className="flex flex-col items-center gap-6 py-4">
-          <CircularStopwatch totalSeconds={0} isRunning={false} isDark={isDark} />
+          <div className="relative w-full max-w-[220px]">
+            <div className="absolute inset-0 flex items-center justify-center opacity-10">
+              <img src="/stopwatch-icon.svg" alt="" className="w-32 h-32" />
+            </div>
+            <CircularStopwatch totalSeconds={0} isRunning={false} isDark={isDark} />
+          </div>
 
           <div className="w-full max-w-[280px] space-y-4">
             <input
@@ -249,7 +258,12 @@ export function PermanentStopwatchCard() {
           </div>
 
           <div className="flex flex-col items-center gap-6">
-            <CircularStopwatch totalSeconds={totalSeconds} isRunning={status === "running"} isDark={isDark} />
+            <div className="relative w-full max-w-[220px]">
+              <div className="absolute inset-0 flex items-center justify-center opacity-10">
+                <img src="/stopwatch-icon.svg" alt="" className="w-32 h-32" />
+              </div>
+              <CircularStopwatch totalSeconds={totalSeconds} isRunning={status === "running"} isDark={isDark} />
+            </div>
 
             <div className="flex gap-3">
               <button
