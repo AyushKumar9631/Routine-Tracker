@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { formatStudyClock, liveElapsedSeconds } from "@/lib/study-timer";
+import { logStopwatchSession } from "@/actions/quick-stopwatch";
 
 const SCREENTIME_COLORS = {
   light: {
@@ -195,6 +196,8 @@ export function PermanentStopwatchCard() {
   const [runningSince, setRunningSince] = useState<string | null>(null);
   const [tick, setTick] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const completingRef = useRef(false);
 
   useEffect(() => {
     setIsDark(document.documentElement.classList.contains("dark"));
@@ -252,12 +255,30 @@ export function PermanentStopwatchCard() {
   };
 
   const handleComplete = () => {
-    setIsActive(false);
-    setStatus("idle");
-    setTopicName("");
-    setAccumulated(0);
-    setRunningSince(null);
-    setTick(null);
+    if (completingRef.current) return;
+    completingRef.current = true;
+    setError(null);
+    const seconds = Math.round(totalSeconds);
+    startTransition(async () => {
+      try {
+        await logStopwatchSession(topicName, seconds);
+        setIsActive(false);
+        setStatus("idle");
+        setTopicName("");
+        setAccumulated(0);
+        setRunningSince(null);
+        setTick(null);
+        router.refresh();
+      } catch (err) {
+        // Freeze the clock so the session isn't lost and Complete can be retried.
+        setAccumulated(seconds);
+        setRunningSince(null);
+        setStatus("paused");
+        setError(err instanceof Error ? err.message : "Couldn't save the session");
+      } finally {
+        completingRef.current = false;
+      }
+    });
   };
 
   return (
@@ -336,6 +357,7 @@ export function PermanentStopwatchCard() {
               Complete
             </button>
           </div>
+          {error && <p className="text-xs text-rust">{error}</p>}
         </div>
       )}
     </div>

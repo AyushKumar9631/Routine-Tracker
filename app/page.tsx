@@ -11,7 +11,7 @@ import { TodayTopCards } from "@/components/today-top-cards";
 import { PermanentStopwatchCard } from "@/components/permanent-stopwatch-card";
 import { QuickStopwatchButton } from "@/components/quick-stopwatch-button";
 import { QuickStopwatchRow } from "@/components/quick-stopwatch-row";
-import { QuickStopwatchCompletedRow } from "@/components/quick-stopwatch-completed-row";
+import { StopwatchCompletedCard } from "@/components/stopwatch-completed-card";
 import { EmptyState } from "@/components/empty-state";
 import { RecruitmentRow } from "@/components/recruitment-row";
 import type {
@@ -22,6 +22,7 @@ import type {
   RecruitmentRound,
   StudyTimerConfig,
 } from "@/lib/types";
+import { calcStopwatchStreak, stopwatchLast14Days } from "@/lib/stopwatch";
 import { computeScreenTimeStats, recentScreenTimeDays } from "@/lib/screentime";
 import { currentRound } from "@/lib/recruitment";
 import {
@@ -226,6 +227,18 @@ export default async function DashboardPage() {
     .eq("period_key", key)
     .order("completed_at", { ascending: false });
   const completedStopwatches = (completedStopwatchRows ?? []) as QuickStopwatch[];
+
+  // Streak + 14-day tracker count any completed stopwatch on a day, whatever
+  // its label.
+  const { data: stopwatchHistoryRows } = await supabase
+    .from("quick_stopwatches")
+    .select("period_key")
+    .eq("status", "completed")
+    .order("period_key", { ascending: false })
+    .limit(400);
+  const stopwatchDayKeys = (stopwatchHistoryRows ?? []).map((r) => r.period_key as string);
+  const stopwatchStreak = calcStopwatchStreak(stopwatchDayKeys, key);
+  const stopwatchDays = stopwatchLast14Days(stopwatchDayKeys, key);
 
   // Active recruitment drives + each one's current round. A drive only shows
   // here while recruitment_details.status = 'active' — once rejected or
@@ -447,16 +460,18 @@ export default async function DashboardPage() {
         {(completedToday.length > 0 || completedStopwatches.length > 0) && (
           <div className="mt-10">
             <div className="mb-1 flex items-center gap-3">
-              <h2 className="shrink-0 text-xs text-ink-soft">Completed ({completedToday.length})</h2>
+              <h2 className="shrink-0 text-xs text-ink-soft">Completed ({completedToday.length + completedStopwatches.length})</h2>
               <div className="h-px flex-1 bg-line" />
             </div>
             <ul className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 xl:grid-cols-3">
               {completedToday.map(renderActivityCard)}
               {completedStopwatches.map((sw) => (
-                <QuickStopwatchCompletedRow
+                <StopwatchCompletedCard
                   key={sw.id}
                   label={sw.label}
                   accumulatedSeconds={sw.accumulated_seconds}
+                  streak={stopwatchStreak}
+                  days={stopwatchDays}
                 />
               ))}
             </ul>

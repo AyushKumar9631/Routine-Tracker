@@ -121,3 +121,33 @@ export async function completeQuickStopwatch(id: string): Promise<QuickStopwatch
   revalidatePath("/");
   return data as QuickStopwatch;
 }
+
+export async function logStopwatchSession(label: string, seconds: number): Promise<QuickStopwatch> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const trimmed = label.trim();
+  if (!trimmed) throw new Error("Give the stopwatch a label");
+  if (!Number.isFinite(seconds) || seconds < 0) throw new Error("Invalid duration");
+
+  const { data, error } = await supabase
+    .from("quick_stopwatches")
+    .insert({
+      user_id: user.id,
+      label: trimmed,
+      status: "completed",
+      accumulated_seconds: seconds,
+      running_since: null,
+      completed_at: new Date().toISOString(),
+      period_key: todayKey(),
+    })
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/");
+  return data as QuickStopwatch;
+}
